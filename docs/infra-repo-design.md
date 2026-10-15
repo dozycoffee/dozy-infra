@@ -147,8 +147,8 @@ dozy.kr (가비아 DNS)
 
 | 스택 | 만드는 것 | 수명 |
 |---|---|---|
-| `stacks/dns` | Cloud DNS 존 (`<이름>.dozy.kr`) | 오래 둠. `down.sh`가 건드리지 않는다 |
-| `stacks/gcp` | 나머지 자원과 **서비스 레코드**(A) | 올리고 내림. destroy 때 레코드도 지워진다 |
+| `stacks/dns` | Cloud DNS 존(`<이름>.dozy.kr`), 인증서 소유 확인용 DNS 인증 레코드, 와일드카드 인증서, certificate map | 오래 둠. `down.sh`가 건드리지 않는다 |
+| `stacks/gcp` | 나머지 자원과 **서비스 레코드**(A). Ingress가 `stacks/dns`의 certificate map을 붙인다 | 올리고 내림. destroy 때 레코드도 지워진다 |
 
 **팀원이 처음 한 번 하는 일:**
 
@@ -160,7 +160,12 @@ dozy.kr (가비아 DNS)
 
 이후에는 `up.sh`/`down.sh`만 쓰면 된다. 가비아에서 NS 레코드 추가가 되는지는 **확인하지 않은 가정**이다([10절](#10-미결정확인-필요-항목) #18).
 
-**TLS 인증서**는 도메인이 로드밸런서 IP로 풀려야 발급된다. 구글 관리형 인증서와 cert-manager 중 무엇을 쓸지는 미결정이다([10절](#10-미결정확인-필요-항목) #19). 올릴 때마다 인증서가 다시 발급되면 대기 시간이 생길 수 있다.
+**TLS 인증서: 구글 관리형(Certificate Manager)으로 결정.** 도메인 소유 확인은 DNS 인증(CNAME 레코드 하나)으로 하므로 **로드밸런서가 없어도 미리 발급**할 수 있다. 와일드카드 인증서(`*.<이름>.dozy.kr`) 한 장을 `stacks/dns`에 두고, 올릴 때마다 Ingress가 certificate map으로 가져다 붙인다. 이렇게 하면 올리고 내릴 때 재발급 대기가 없고, cert-manager와 달리 팀원이 `dozy.kr` 하나를 공유해도 Let's Encrypt의 도메인 단위 발급 제한을 함께 소진하지 않는다. cert-manager는 인증서 자동화를 학습하는 별도 실습으로 나중에 얹는다.
+
+아래는 **확인하지 않은 가정**이다([10절](#10-미결정확인-필요-항목) #19).
+
+- GKE Autopilot의 외부 Ingress에서 certificate map을 붙일 수 있는지(안 되면 Gateway API로 간다)
+- Certificate Manager의 비용(가격표로 확인)
 
 ## 5. 서비스 추가 방식
 
@@ -366,7 +371,7 @@ topics:
 | 16 | 비밀값 주입 방식 | External Secrets Operator와 CSI 드라이버 중 선택 (상위 문서 7절) |
 | 17 | 공통 차트 범위 | auth는 서명 키 볼륨과 replicas 1 고정이 있어 공통 차트로 충분한지, 예외가 되는지 |
 | 18 | 가비아 NS 레코드 | 서브도메인 위임에 가비아 DNS의 NS 레코드 추가가 되는지 **가정**했다. 안 되면 팀원별 A 레코드를 가비아에서 직접 추가하고 고정 IP를 예약하는 방식으로 바꾼다 |
-| 19 | TLS 인증서 방식 | 구글 관리형 인증서 vs cert-manager. 올리고 내리는 주기에서 발급 대기와 발급 횟수 제한이 부담이 되는지 확인 |
+| 19 | TLS 인증서 연동 확인 | **구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정.** 남은 확인: Autopilot 외부 Ingress에서 certificate map 사용 가능 여부(안 되면 Gateway API), Certificate Manager 비용 |
 
 ## 11. 구축 순서
 

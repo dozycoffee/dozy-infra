@@ -345,7 +345,7 @@ dozy-infra/
 | 11 | Kafka 구성 | StatefulSet 직접 구성으로 시작한다(Strimzi는 보류). Autopilot에서 StatefulSet과 PVC가 제약 없이 동작하는지 확인 |
 | 12 | Kafka 보존 정책 | 단일 브로커의 디스크와 토픽 보관 기간 |
 | 13 | 컨테이너 레지스트리 | ghcr 유지 vs Artifact Registry |
-| 14 | 도메인 | `dozy.kr` 확보(가비아, `www`는 Vercel 홈페이지). 팀원별 서브도메인을 Cloud DNS로 NS 위임하는 방식으로 정했고(가비아 NS 지원은 가정), TLS 인증서 방식은 미결정. [infra-repo-design.md 4.4절](infra-repo-design.md#44-도메인과-dns) |
+| 14 | 도메인 | `dozy.kr` 확보(가비아, `www`는 Vercel 홈페이지). 팀원별 서브도메인을 Cloud DNS로 NS 위임하는 방식으로 정했고(가비아 NS 지원은 가정), TLS는 구글 관리형 인증서(Certificate Manager, 와일드카드)로 정했다(Ingress 연동은 확인 필요). [infra-repo-design.md 4.4절](infra-repo-design.md#44-도메인과-dns) |
 | 15 | catalog 릴리스 | v0.2.0 릴리스 전이라 `sha-` 태그로 고정한다. 릴리스 뒤 `X.Y.Z`로 전환 |
 | 16 | Store 분리 진행 중 | catalog의 매장 기능이 Store로 이전되는 중이다. 4단계(v0.3.0)에서 catalog의 `store`·`exposure` 모듈과 테이블이 제거되어 배포 설정이 바뀔 수 있다 |
 | 17 | store 이미지 | store 저장소에 Dockerfile과 이미지 푸시 워크플로가 없다 |

@@ -18,6 +18,7 @@
 - OMS 언급을 모두 제거했다(서비스는 필요할 때 추가).
 - 이니셜 커밋과 푸시(`3a04505`).
 - 도메인 설계 추가: `dozy.kr`(가비아) 아래 팀원별 서브도메인을 Cloud DNS로 NS 위임, DNS 존은 오래 두는 별도 스택(`stacks/dns`). 가비아 NS 지원은 가정이다.
+- TLS 인증서는 구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정. 인증서는 `stacks/dns`에 둔다. Autopilot 외부 Ingress의 certificate map 지원과 비용은 확인 필요.
 
 ## 다음 세션에서 할 일
 
