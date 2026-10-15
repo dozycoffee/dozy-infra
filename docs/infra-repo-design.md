@@ -258,19 +258,37 @@ catalog 관련 주의:
 
 ### 7.2 선언 형식 (초안)
 
+값은 서비스 저장소의 코드와 문서에서 확인한 것만 적고, 확인하지 못한 값은 `TBD`로 둔다(2026-10-15 기준 각 저장소 `main`).
+
 ```yaml
 topics:
+  # catalog (발행). 토픽 생성 코드 없음. catalog 이행 계획 문서는 "운영 브로커가 자동 생성을 끄면 미리 만든다"고 한다
   - name: dozy.catalog.product
     owner: catalog
-    partitions: TBD        # catalog 이벤트 계약(docs/events/product.md) 확인 후 확정. 확정 뒤에는 늘리지 않는다
-    replicationFactor: 1   # 단일 브로커
-    retention: TBD         # Store 구독 시작 지연보다 길게
-    cleanupPolicy: delete
-  - name: dozy.inventory.product      # inventory가 압축으로 만든다고 wms 설정에 적혀 있음. 확인 필요
+    partitions: TBD        # 처음 정하면 늘리지 않는다 (키와 파티션 대응이 바뀌면 순서가 깨진다)
+    retention: TBD         # Store가 구독을 시작하기까지의 지연보다 길게
+
+  # inventory (발행). 토픽 생성 코드 없음. 발행기가 {topic-prefix}.{집계 유형 소문자}로 보낸다(ADR-0025)
+  - { name: dozy.inventory.inventory,   owner: inventory, partitions: TBD }
+  - { name: dozy.inventory.reservation, owner: inventory, partitions: TBD }   # wms가 구독
+  - { name: dozy.inventory.lot,         owner: inventory, partitions: TBD }   # wms가 구독
+  - { name: dozy.inventory.adjustment,  owner: inventory, partitions: TBD }
+  - name: dozy.inventory.product                       # wms가 구독
     owner: inventory
-    cleanupPolicy: compact
-  # dozy.inventory.reservation, dozy.inventory.lot, dozy.wms.warehouse-access 도 같은 형식으로 추가
+    partitions: TBD
+    cleanupPolicy: compact   # 필요(7.5절 #1): wms는 새 환경에서 처음부터 읽어 상품 사본을 채운다
+
+  # wms (발행). wms가 NewTopic으로 직접 만든다: partitions 3, replicas 1, cleanup.policy=compact
+  - { name: dozy.wms.warehouse-access, owner: wms, partitions: 3, replicationFactor: 1, cleanupPolicy: compact }   # inventory가 구독
+
+  # 실패한 메시지를 보내는 DLT. 소비 서비스의 오류 처리기가 `{원 토픽}.dlt`(소문자)로 보낸다. 파티션은 지정하지 않는다
+  - { name: dozy.wms.warehouse-access.dlt,  owner: inventory, partitions: TBD }
+  - { name: dozy.inventory.product.dlt,     owner: wms,       partitions: TBD }
+  - { name: dozy.inventory.reservation.dlt, owner: wms,       partitions: TBD }
+  - { name: dozy.inventory.lot.dlt,         owner: wms,       partitions: TBD }
 ```
+
+모든 토픽의 복제 계수는 단일 브로커라 1이다(생략 시 기본값으로 1을 쓴다).
 
 ### 7.3 적용
 
@@ -279,9 +297,22 @@ topics:
 | `self` | `kafka-self` 차트의 Job이 브로커가 뜬 뒤 `kafka-topics.sh --create --if-not-exists`를 실행한다. 이미 있으면 건너뛴다 |
 | `managed` | 테라폼 `kafka-managed` 모듈이 같은 파일을 읽어 토픽을 만든다(GCP provider의 토픽 리소스 지원 여부는 확인 필요) |
 
-### 7.4 서비스 쪽 토픽 생성 코드
+### 7.4 서비스 쪽 토픽 생성 코드 (현재 상태)
 
-현재 inventory와 wms는 자기 토픽을 직접 만드는 코드가 있다(wms 설정의 "토픽 생성" 항목). 같은 설정이면 무해하지만 설정이 어긋나면 드리프트가 생기므로, **장기적으로 제거하고 중앙 선언으로 일원화**하는 것을 권한다. 서비스 저장소 작업이므로 [미결정 항목](#10-미결정확인-필요-항목)에 둔다. 그 전까지는 `topics.yaml`의 값이 서비스 코드의 값과 같아야 한다.
+각 저장소 코드를 확인한 결과:
+
+| 서비스 | 토픽 생성 코드 | 비고 |
+|---|---|---|
+| catalog | 없음 | 미리 만들어 두는 것을 전제로 한다 |
+| inventory | **없음** | `dozy.inventory.{집계}` 5개 토픽으로 발행만 한다. 브로커의 자동 생성에 기대는 구조로 보인다 |
+| wms | `WarehouseAccessTopicConfig`의 `NewTopic` 빈 하나 → **제거함**(wms ADR-0026, 브랜치 `chore/remove-warehouse-access-topic-creation`, PR 전) | 제거 전 설정은 `dozy.wms.warehouse-access`(파티션 3, 복제 1, 압축). 서비스가 토픽을 다시 만들지 못하게 하는 테스트(`NoTopicCreationTest`)를 추가했다 |
+
+따라서 **inventory에는 지울 코드가 없다.** 브로커 자동 생성을 끄면(7.1절) inventory의 5개 토픽을 미리 만들어야 하고, 그래서 `topics.yaml`에 선언한다. wms의 `NewTopic`은 이 방식과 맞지 않아 제거했고, 결정과 이유는 wms ADR-0026에 있다. 파티션 3, 복제 1, 압축은 `topics.yaml`이 그대로 이어받는다.
+
+### 7.5 확인된 불일치
+
+1. **`dozy.inventory.product` 압축:** wms ADR-0021은 "inventory가 토픽을 압축으로 만든다"고 했지만 inventory에는 그 코드가 없었다. wms는 새 환경에서 이 토픽을 처음부터 읽어 상품 사본을 채우므로 압축(또는 무기한 보존)이 필요하다. 상품 이벤트는 변경 후 **전체 스냅샷**이고 키가 상품 ID라서 압축으로 최신 상태만 남겨도 사본을 복원할 수 있다. **결정:** 토픽을 인프라가 `compact`로 선언하고(`topics.yaml`), wms ADR-0020·0021을 그에 맞게 고쳤다. **inventory 코드 수정은 필요 없다.** 다만 inventory의 이벤트 문서(`docs/events.md`)에 이 토픽의 압축 요구를 적어 두는 것을 권한다(서비스 저장소 문서 작업).
+2. **DLT 토픽:** inventory와 wms의 오류 처리기는 실패한 메시지를 `{원 토픽}.dlt`로 보낸다. 자동 생성을 끄면 이 토픽이 없어서 메시지를 보관하지 못할 수 있으므로 `topics.yaml`에 선언한다. 없을 때 서비스가 정확히 어떻게 동작하는지는 확인하지 않았다.
 
 ## 8. 실행 프로필과 부하 테스트
 
@@ -356,7 +387,7 @@ topics:
 | 1 | 문서 수락 | 2절의 결정 사항 전체 |
 | 2 | 매니지드 Kafka 인증 | GCP 매니지드 Kafka가 요구하는 인증 방식(SASL 종류, TLS)과 서비스가 환경변수만으로 받을 수 있는지(`spring.kafka.properties.*` 바인딩). 안 되면 서비스 저장소 설정 수정 필요 |
 | 3 | 토픽 값 | `dozy.catalog.product` 등의 파티션 수, 보존 기간. 각 서비스 이벤트 계약 확인 후 확정 |
-| 4 | 토픽 생성 코드 제거 | inventory, wms의 서비스 쪽 토픽 생성을 제거할지(서비스 저장소 작업). 전까지는 값 일치 유지 |
+| 4 | wms 토픽 생성 코드 제거 | 제거함(wms ADR-0026, PR 전). inventory에는 지울 코드가 없다(7.4절). wms PR이 머지되기 전에는 값 일치를 유지한다 |
 | 5 | 매니지드 토픽 리소스 | GCP provider가 매니지드 Kafka 토픽 리소스를 지원하는지 |
 | 6 | Auth 프로필 | Auth를 `prod`로 올릴지, SMTP 제공자 확정 전까지 `dev`로 둘지 |
 | 7 | 부하 테스트 토큰 | Auth의 system client 토큰 발급 방식 확인. (b) 가능 여부, 안 되면 (a) |
@@ -372,6 +403,8 @@ topics:
 | 17 | 공통 차트 범위 | auth는 서명 키 볼륨과 replicas 1 고정이 있어 공통 차트로 충분한지, 예외가 되는지 |
 | 18 | 가비아 NS 레코드 | 서브도메인 위임에 가비아 DNS의 NS 레코드 추가가 되는지 **가정**했다. 안 되면 팀원별 A 레코드를 가비아에서 직접 추가하고 고정 IP를 예약하는 방식으로 바꾼다 |
 | 19 | TLS 인증서 연동 확인 | **구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정.** 남은 확인: Autopilot 외부 Ingress에서 certificate map 사용 가능 여부(안 되면 Gateway API), Certificate Manager 비용 |
+| 20 | inventory 이벤트 문서의 압축 요구 | 결정: 인프라가 `compact`로 선언(7.5절). inventory `docs/events.md`에 이 요구를 적을지(서비스 저장소 문서 작업) |
+| 21 | DLT 토픽 | `{원 토픽}.dlt`가 없을 때 서비스 동작 확인. 우선 `topics.yaml`에 선언 |
 
 ## 11. 구축 순서
 
