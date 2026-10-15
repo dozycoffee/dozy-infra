@@ -6,6 +6,8 @@ crash.log
 *.tfvars
 !*.tfvars.example
 .terraform.lock.hcl.bak
+# 잠금 파일은 루트 모듈(stacks/*)에서만 커밋한다
+terraform/modules/**/.terraform.lock.hcl
 
 # render-config.sh가 만드는 값 파일 (terraform output 기반)
 k8s/overlays/*/generated/

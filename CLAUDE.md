@@ -44,7 +44,7 @@ scripts/             verify.sh, up.sh, down.sh, deploy.sh, render-config.sh
 scripts/verify.sh
 ```
 
-셸 문법, `feature_list.json` 형식, `terraform fmt/validate`, `helm lint/template`(local 프로필 사용 차단 포함)를 검사한다. 검사 대상이 있는데 도구가 없으면 실패하고, 대상이 없어 건너뛴 항목은 출력에 남는다. 통과하지 못한 상태로 작업 완료를 선언하지 않는다.
+셸 문법, `feature_list.json` 형식, `terraform fmt/validate/test`(모듈 테스트는 mock provider라 GCP 자격 증명이 필요 없다), `helm lint/template`(local 프로필 사용 차단 포함)를 검사한다. 검사 대상이 있는데 도구가 없으면 실패하고, 대상이 없어 건너뛴 항목은 출력에 남는다. 통과하지 못한 상태로 작업 완료를 선언하지 않는다.
 
 ## 작업 흐름
 

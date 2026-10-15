@@ -126,10 +126,37 @@ gcloud services list --enabled | grep -c googleapis   # 켠 API가 보이는지
 gcloud storage buckets describe "gs://${STATE_BUCKET}" --format="value(versioning.enabled)"   # True
 ```
 
+### 7. DNS 스택 올리기 (한 번)
+
+서브도메인 DNS 존과 와일드카드 인증서를 만든다. 오래 두는 스택이라 `down.sh`가 지우지 않는다. 설계는 [설계 문서 4.4절](docs/infra-repo-design.md#44-도메인과-dns)에 있다.
+
+```bash
+cd terraform/stacks/dns
+cp terraform.tfvars.example terraform.tfvars   # project_id, domain(<이름>.dozy.kr)을 채운다
+
+terraform init \
+  -backend-config="bucket=${STATE_BUCKET}" \
+  -backend-config="prefix=dns"
+terraform plan
+terraform apply
+terraform output name_servers
+```
+
+1. `terraform output name_servers`로 나온 네임서버 4개를 **도메인 소유자에게 전달**한다.
+2. 도메인 소유자가 가비아 DNS 관리에서 `<이름>.dozy.kr`의 **NS 레코드**로 등록한다(호스트는 `<이름>`, 값은 네임서버 4개). `www`와 다른 기존 레코드는 건드리지 않는다.
+3. 위임이 되었는지 확인한다.
+
+```bash
+dig +short NS <이름>.dozy.kr
+```
+
+네임서버가 보이면 위임이 된 것이다. 인증서는 이 위임이 끝나야 발급되며(상태가 `PROVISIONING`에서 `ACTIVE`로 바뀜), 콘솔의 Certificate Manager에서 확인한다. 가비아가 NS 레코드 추가를 지원하는지는 **확인하지 않은 가정**이다.
+
+`terraform apply`는 실제 자원(DNS 존, 인증서)을 만든다. 존은 소액이지만 상시 과금이므로 쓰지 않을 때도 유지하는 자원임을 알고 시작한다.
+
 ### 이후 순서
 
-1. `terraform/stacks/dns`로 서브도메인 DNS 존을 만들고 가비아에 NS 레코드를 등록한다(한 번). 자세한 내용은 [설계 문서 4.4절](docs/infra-repo-design.md#44-도메인과-dns).
-2. `scripts/up.sh`로 올린다(구축 중).
+`scripts/up.sh`로 올린다(구축 중).
 
 ## 사용법
 

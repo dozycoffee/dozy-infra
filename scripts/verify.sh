@@ -40,6 +40,11 @@ if find terraform -name '*.tf' -type f 2>/dev/null | grep -q .; then
     while IFS= read -r d; do
       (cd "$d" && terraform init -backend=false -input=false >/dev/null && terraform validate) || ng "terraform validate: $d"
     done < <(find terraform/stacks -mindepth 1 -maxdepth 1 -type d)
+    # 모듈 테스트(mock provider라 GCP 자격 증명이 필요 없다)
+    while IFS= read -r t; do
+      d="$(dirname "$(dirname "$t")")"
+      (cd "$d" && terraform init -backend=false -input=false >/dev/null && terraform test) || ng "terraform test: $d"
+    done < <(find terraform/modules -path '*/tests/*.tftest.hcl' -type f)
   else
     ng "terraform 파일이 있는데 terraform이 설치되어 있지 않다"
   fi
