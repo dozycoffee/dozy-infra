@@ -112,8 +112,8 @@ dozy-infra/
 ### 4.2 상태(state) 분리
 
 - 상태 파일은 **각자의 GCS 버킷**에 둔다. 공유하면 서로 덮어쓴다.
-- 버킷 이름은 코드에 넣지 않고 `terraform init -backend-config="bucket=<내 버킷>"`로 준다.
-- 버킷 생성은 README의 첫 단계(수동 `gcloud` 명령)에 둔다.
+- 버킷 이름은 코드에 넣지 않고 `terraform init -backend-config="bucket=<내 버킷>"`로 준다. 한 버킷에서 스택(`dns`, `gcp`)마다 `prefix`로 상태를 나눈다.
+- 버킷 생성은 README의 "처음 한 번: GCP 준비"(수동 `gcloud` 명령)에 있다.
 
 ### 4.3 테라폼 → Helm 값 전달
 

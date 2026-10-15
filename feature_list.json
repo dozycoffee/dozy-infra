@@ -10,7 +10,7 @@
     "id": "infra-02",
     "name": "GCP 프로젝트와 예산 알림, 상태 버킷",
     "description": "수동 절차를 README에 정리하고 예산 알림을 먼저 설정한다. 상태 버킷은 팀원별로 수동 생성한다",
-    "status": "pending",
+    "status": "completed",
     "dependencies": [
       "infra-01"
     ]

@@ -2,8 +2,8 @@
 
 ## 현재 상태
 
-- 저장소 뼈대만 있다(`infra-01` 완료). 테라폼과 차트는 아직 없다.
-- 설계는 `docs/infra-repo-design.md`에 있고, 미결정 항목 17개가 남아 있다(특히 매니지드 Kafka 인증, 부하 테스트 토큰 방식, 토픽 값, ghcr 공개 여부).
+- 저장소 뼈대와 GCP 준비 절차(README)까지 있다(`infra-01`, `infra-02` 완료). 테라폼과 차트는 아직 없다.
+- 설계는 `docs/infra-repo-design.md`에 있고, 미결정·확인 필요 항목 19개가 남아 있다(특히 매니지드 Kafka 인증, 부하 테스트 토큰 방식, 토픽 값, ghcr 공개 여부).
 - 결정됨: 서비스 배포는 공통 Helm 차트, 대상은 auth/inventory/wms/catalog(store는 이미지 준비 후), Kafka 토픽은 중앙 선언, 클라우드에서 `local` 프로필 금지.
 - `helm`은 설치되어 있고 `terraform`은 없다. `.tf` 파일을 추가하기 전에 설치해야 `scripts/verify.sh`가 통과한다.
 
@@ -18,11 +18,12 @@
 - OMS 언급을 모두 제거했다(서비스는 필요할 때 추가).
 - 이니셜 커밋과 푸시(`3a04505`).
 - 도메인 설계 추가: `dozy.kr`(가비아) 아래 팀원별 서브도메인을 Cloud DNS로 NS 위임, DNS 존은 오래 두는 별도 스택(`stacks/dns`). 가비아 NS 지원은 가정이다.
+- `infra-02` 완료: README에 "처음 한 번: GCP 준비"(도구 설치, 로그인, 프로젝트·결제, 예산 알림, API, 상태 버킷, 확인) 추가. gcloud 옵션은 `--help`로 확인했고 실제 실행은 하지 않았다. 설계 문서 4.2절에 스택별 `prefix`로 상태를 나누는 규칙 추가.
 - TLS 인증서는 구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정. 인증서는 `stacks/dns`에 둔다. Autopilot 외부 Ingress의 certificate map 지원과 비용은 확인 필요.
 
 ## 다음 세션에서 할 일
 
 1. 설계 문서의 결정 필요 항목을 차차 정한다(`docs/infra-repo-design.md` 10절). 먼저 Auth 프로필, 부하 테스트 토큰, 토픽 값.
-2. `infra-02`: GCP 프로젝트, 예산 알림, 상태 버킷 절차를 README에 정리한다.
-3. `terraform` 설치 확인.
+2. `terraform` 설치(README 0단계). 이후 `.tf` 파일을 추가하면 `scripts/verify.sh`가 terraform을 요구한다.
+3. `infra-02b`: DNS 스택과 서브도메인 위임. 먼저 가비아에서 NS 레코드 추가가 되는지 확인한다.
 4. `infra-03`: `network` 모듈 작성.
