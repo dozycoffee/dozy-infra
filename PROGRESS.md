@@ -21,7 +21,7 @@
 - `infra-02` 완료: README에 "처음 한 번: GCP 준비"(도구 설치, 로그인, 프로젝트·결제, 예산 알림, API, 상태 버킷, 확인) 추가. gcloud 옵션은 `--help`로 확인했고 실제 실행은 하지 않았다. 설계 문서 4.2절에 스택별 `prefix`로 상태를 나누는 규칙 추가.
 - `infra-02b` 완료: `terraform/modules/dns`(Cloud DNS 존, Certificate Manager DNS 인증 CNAME, 와일드카드 인증서, certificate map)와 `terraform/stacks/dns`. mock provider 테스트 7개(검증 오류 3개 포함), `verify.sh`에 `terraform test` 단계 추가. 잘못된 설정에서 테스트가 실패하는 것도 확인했다. 실제 GCP에 apply하지는 않았다.
 - 토픽 코드 조사: inventory에는 토픽 생성 코드가 없고(5개 토픽을 자동 생성에 의존), wms에만 `NewTopic` 하나가 있었다. DLT(`{토픽}.dlt`)는 토픽별로 따로 있다. 설계 문서 7절을 사실대로 고쳤다.
-- wms 저장소: 브랜치 `chore/remove-warehouse-access-topic-creation`에서 `NewTopic` 설정 제거, ADR-0026 추가, ADR-0020·0021 갱신, `NoTopicCreationTest` 추가(복원하면 실패하는 것도 확인). `./gradlew build` 통과. 커밋·PR은 아직이다.
+- wms 저장소: 브랜치 `chore/remove-warehouse-access-topic-creation`에서 `NewTopic` 설정 제거, ADR-0026 추가, ADR-0020·0021 갱신, `NoTopicCreationTest` 추가(복원하면 실패하는 것도 확인). `./gradlew build` 통과. 이슈 dozycoffee/dozy-wms-api#155, PR #156(머지 대기).
 - TLS 인증서는 구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정. 인증서는 `stacks/dns`에 둔다. Autopilot 외부 Ingress의 certificate map 지원과 비용은 확인 필요.
 
 ## 다음 세션에서 할 일

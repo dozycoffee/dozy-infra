@@ -305,7 +305,7 @@ topics:
 |---|---|---|
 | catalog | 없음 | 미리 만들어 두는 것을 전제로 한다 |
 | inventory | **없음** | `dozy.inventory.{집계}` 5개 토픽으로 발행만 한다. 브로커의 자동 생성에 기대는 구조로 보인다 |
-| wms | `WarehouseAccessTopicConfig`의 `NewTopic` 빈 하나 → **제거함**(wms ADR-0026, 브랜치 `chore/remove-warehouse-access-topic-creation`, PR 전) | 제거 전 설정은 `dozy.wms.warehouse-access`(파티션 3, 복제 1, 압축). 서비스가 토픽을 다시 만들지 못하게 하는 테스트(`NoTopicCreationTest`)를 추가했다 |
+| wms | `WarehouseAccessTopicConfig`의 `NewTopic` 빈 하나 → **제거함**(wms ADR-0026, [dozy-wms-api PR #156](https://github.com/dozycoffee/dozy-wms-api/pull/156), 머지 전) | 제거 전 설정은 `dozy.wms.warehouse-access`(파티션 3, 복제 1, 압축). 서비스가 토픽을 다시 만들지 못하게 하는 테스트(`NoTopicCreationTest`)를 추가했다 |
 
 따라서 **inventory에는 지울 코드가 없다.** 브로커 자동 생성을 끄면(7.1절) inventory의 5개 토픽을 미리 만들어야 하고, 그래서 `topics.yaml`에 선언한다. wms의 `NewTopic`은 이 방식과 맞지 않아 제거했고, 결정과 이유는 wms ADR-0026에 있다. 파티션 3, 복제 1, 압축은 `topics.yaml`이 그대로 이어받는다.
 
@@ -387,7 +387,7 @@ topics:
 | 1 | 문서 수락 | 2절의 결정 사항 전체 |
 | 2 | 매니지드 Kafka 인증 | GCP 매니지드 Kafka가 요구하는 인증 방식(SASL 종류, TLS)과 서비스가 환경변수만으로 받을 수 있는지(`spring.kafka.properties.*` 바인딩). 안 되면 서비스 저장소 설정 수정 필요 |
 | 3 | 토픽 값 | `dozy.catalog.product` 등의 파티션 수, 보존 기간. 각 서비스 이벤트 계약 확인 후 확정 |
-| 4 | wms 토픽 생성 코드 제거 | 제거함(wms ADR-0026, PR 전). inventory에는 지울 코드가 없다(7.4절). wms PR이 머지되기 전에는 값 일치를 유지한다 |
+| 4 | wms 토픽 생성 코드 제거 | 제거함(wms ADR-0026, dozy-wms-api PR #156, 머지 전). inventory에는 지울 코드가 없다(7.4절). wms PR이 머지되기 전에는 값 일치를 유지한다 |
 | 5 | 매니지드 토픽 리소스 | GCP provider가 매니지드 Kafka 토픽 리소스를 지원하는지 |
 | 6 | Auth 프로필 | Auth를 `prod`로 올릴지, SMTP 제공자 확정 전까지 `dev`로 둘지 |
 | 7 | 부하 테스트 토큰 | Auth의 system client 토큰 발급 방식 확인. (b) 가능 여부, 안 되면 (a) |
