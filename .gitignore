@@ -1,0 +1,25 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl.bak
+
+# render-config.sh가 만드는 값 파일 (terraform output 기반)
+k8s/overlays/*/generated/
+
+# 비밀값
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+secrets/
+
+# 개인 설정
+CLAUDE.local.md
+.DS_Store
+.idea/
+.vscode/
