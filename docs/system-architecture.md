@@ -175,7 +175,7 @@ flowchart TB
 
 | 도메인(예시) | 대상 | 비고 |
 |---|---|---|
-| `admin.<도메인>` | admin-console | 정적 호스팅 |
+| `admin.<도메인>` | admin-console | 정적 호스팅. 도메인은 팀원별 서브도메인 `<이름>.dozy.kr` 아래에 둔다 |
 | `auth.<도메인>` | dozy-auth | refresh 쿠키 때문에 콘솔과 같은 사이트(eTLD+1) 아래 두는 것이 안전 |
 | `wms.<도메인>` | dozy-wms-api | 업무 API만 노출 |
 | `inventory.<도메인>` | dozy-inventory-api | 업무 API만 노출 |
@@ -345,7 +345,7 @@ dozy-infra/
 | 11 | Kafka 구성 | StatefulSet 직접 구성으로 시작한다(Strimzi는 보류). Autopilot에서 StatefulSet과 PVC가 제약 없이 동작하는지 확인 |
 | 12 | Kafka 보존 정책 | 단일 브로커의 디스크와 토픽 보관 기간 |
 | 13 | 컨테이너 레지스트리 | ghcr 유지 vs Artifact Registry |
-| 14 | 도메인 | 도메인 확보와 DNS, 인증서 |
+| 14 | 도메인 | `dozy.kr` 확보(가비아, `www`는 Vercel 홈페이지). 팀원별 서브도메인을 Cloud DNS로 NS 위임하는 방식으로 정했고(가비아 NS 지원은 가정), TLS 인증서 방식은 미결정. [infra-repo-design.md 4.4절](infra-repo-design.md#44-도메인과-dns) |
 | 15 | catalog 릴리스 | v0.2.0 릴리스 전이라 `sha-` 태그로 고정한다. 릴리스 뒤 `X.Y.Z`로 전환 |
 | 16 | Store 분리 진행 중 | catalog의 매장 기능이 Store로 이전되는 중이다. 4단계(v0.3.0)에서 catalog의 `store`·`exposure` 모듈과 테이블이 제거되어 배포 설정이 바뀔 수 있다 |
 | 17 | store 이미지 | store 저장소에 Dockerfile과 이미지 푸시 워크플로가 없다 |

@@ -42,9 +42,11 @@ dozy-infra/
 │  │  ├─ cloudsql/            MySQL, PostgreSQL 인스턴스. services 맵을 읽어 DB와 계정 생성
 │  │  ├─ iam/                 서비스 계정, Workload Identity
 │  │  ├─ secrets/             Secret Manager 항목. services 맵을 읽어 껍데기 생성(값은 넣지 않음)
+│  │  ├─ dns/                 팀원별 서브도메인용 Cloud DNS 존, 서비스 레코드
 │  │  └─ kafka-managed/       매니지드 Kafka. topics.yaml을 읽어 토픽 생성 (kafka_mode=managed일 때만)
 │  └─ stacks/
-│     └─ gcp/                 위 모듈을 호출하는 루트 모듈
+│     ├─ dns/                 DNS 존만 만드는 루트 모듈 (오래 두는 스택, 4.4절)
+│     └─ gcp/                 나머지 자원을 만드는 루트 모듈 (올리고 내리는 스택)
 │        ├─ main.tf, variables.tf, outputs.tf
 │        ├─ backend.tf        버킷 이름은 비워 두고 init 때 주입
 │        └─ terraform.tfvars.example   services 맵 예시 포함
@@ -104,7 +106,7 @@ dozy-infra/
 | 자원 이름 접두사 | `terraform.tfvars` | 이름 충돌 방지 |
 | `kafka_mode` | `terraform.tfvars` | `self` 또는 `managed`. 기본 `self` |
 | 접근 허용 IP (컨트롤 플레인) | `terraform.tfvars` | 본인 IP |
-| 도메인 | `terraform.tfvars` | 없으면 외부 IP로 접근 |
+| 서브도메인 | `terraform.tfvars` (`domain = "<이름>.dozy.kr"`) | 비우면 외부 IP로 접근. [4.4절](#44-도메인과-dns) |
 | 비밀값 | Secret Manager | 값은 각자 `gcloud`로 넣는다. 파일이나 저장소에 두지 않는다 |
 
 ### 4.2 상태(state) 분리
@@ -116,6 +118,49 @@ dozy-infra/
 ### 4.3 테라폼 → Helm 값 전달
 
 Cloud SQL의 프라이빗 IP, 매니지드 Kafka 주소 같은 값은 테라폼이 만든 뒤에야 안다. `render-config.sh`가 `terraform output`을 읽어 `releases/generated/values.yaml`을 만들고, `deploy.sh`가 이 파일을 `-f`로 마지막에 겹쳐 준다(우선순위: `common.yaml` < `<서비스>.yaml` < `generated/values.yaml`). 생성 파일은 커밋하지 않는다.
+
+### 4.4 도메인과 DNS
+
+도메인 `dozy.kr`은 가비아에서 샀고 DNS도 가비아가 관리한다. 팀원이 각자 환경을 올려도 도메인 하나로 충분하도록, **팀원마다 서브도메인 하나를 가비아에서 그 팀원의 Cloud DNS 존으로 위임**한다.
+
+현재 상태(2026-10-15 공개 DNS 조회):
+
+| 이름 | 상태 |
+|---|---|
+| `www.dozy.kr` | Vercel을 가리킨다(기존 홈페이지). **건드리지 않는다** |
+| `dozy.kr` (루트) | A 레코드 없음 |
+| `auth.`, `api.`, `admin.` 등 | 비어 있음 |
+
+```
+dozy.kr (가비아 DNS)
+├─ www.dozy.kr               → Vercel (기존 홈페이지)
+├─ jinwoo.dozy.kr    NS 위임 → 진우의 Cloud DNS 존
+│    ├─ auth.jinwoo.dozy.kr       → 진우 로드밸런서 IP
+│    ├─ catalog.jinwoo.dozy.kr    → 같은 IP (Ingress가 이름으로 서비스를 나눔)
+│    └─ ...
+└─ <이름>.dozy.kr    NS 위임 → 그 팀원의 Cloud DNS 존
+```
+
+**이름 규칙:** `<서비스>.<팀원이름>.dozy.kr` (예: `auth.jinwoo.dozy.kr`, `admin.jinwoo.dozy.kr`). 콘솔과 auth는 같은 사이트(`dozy.kr`) 아래라서 refresh 쿠키 조건을 지킨다.
+
+**존은 오래 두는 별도 스택으로 만든다.** `terraform destroy`로 존을 지우면 다시 만들 때 네임서버가 달라져서 가비아의 NS 레코드를 매번 다시 고쳐야 한다. 그래서 존만 `stacks/dns`로 분리하고 올리고 내리는 `stacks/gcp`와 상태를 따로 둔다. 존은 소액이라 계속 두는 것이 낫다(금액은 가격표로 확인).
+
+| 스택 | 만드는 것 | 수명 |
+|---|---|---|
+| `stacks/dns` | Cloud DNS 존 (`<이름>.dozy.kr`) | 오래 둠. `down.sh`가 건드리지 않는다 |
+| `stacks/gcp` | 나머지 자원과 **서비스 레코드**(A) | 올리고 내림. destroy 때 레코드도 지워진다 |
+
+**팀원이 처음 한 번 하는 일:**
+
+```
+1. stacks/dns apply          → output: 이 존의 네임서버 4개
+2. 도메인 소유자에게 전달      → 가비아에서 <이름>.dozy.kr 의 NS 레코드로 등록 (한 번만)
+3. dig NS <이름>.dozy.kr 로 위임 확인
+```
+
+이후에는 `up.sh`/`down.sh`만 쓰면 된다. 가비아에서 NS 레코드 추가가 되는지는 **확인하지 않은 가정**이다([10절](#10-미결정확인-필요-항목) #18).
+
+**TLS 인증서**는 도메인이 로드밸런서 IP로 풀려야 발급된다. 구글 관리형 인증서와 cert-manager 중 무엇을 쓸지는 미결정이다([10절](#10-미결정확인-필요-항목) #19). 올릴 때마다 인증서가 다시 발급되면 대기 시간이 생길 수 있다.
 
 ## 5. 서비스 추가 방식
 
@@ -187,6 +232,7 @@ catalog 관련 주의:
 3. terraform destroy
 ```
 
+- `down.sh`는 `stacks/gcp`만 내린다. DNS 존(`stacks/dns`)은 남긴다([4.4절](#44-도메인과-dns)).
 - Cloud SQL은 `deletion_protection=false`로 만든다(학습 환경). 데이터는 사라진다.
 - 부하 테스트 직후 비용을 줄이려면 `down.sh --pause`(파드 0개, Cloud SQL 중지)를 둔다.
 
@@ -319,11 +365,13 @@ topics:
 | 15 | JWKS 조회 경로 | 상위 문서 미결정 #5와 같다. `AUTH_ISSUER_BASE_URI`를 어떤 주소로 줄지 결정이 선행된다 |
 | 16 | 비밀값 주입 방식 | External Secrets Operator와 CSI 드라이버 중 선택 (상위 문서 7절) |
 | 17 | 공통 차트 범위 | auth는 서명 키 볼륨과 replicas 1 고정이 있어 공통 차트로 충분한지, 예외가 되는지 |
+| 18 | 가비아 NS 레코드 | 서브도메인 위임에 가비아 DNS의 NS 레코드 추가가 되는지 **가정**했다. 안 되면 팀원별 A 레코드를 가비아에서 직접 추가하고 고정 IP를 예약하는 방식으로 바꾼다 |
+| 19 | TLS 인증서 방식 | 구글 관리형 인증서 vs cert-manager. 올리고 내리는 주기에서 발급 대기와 발급 횟수 제한이 부담이 되는지 확인 |
 
 ## 11. 구축 순서
 
 1. `dozy-infra` 저장소 뼈대 (완료)
-2. GCP 프로젝트, **예산 알림**, 상태 버킷(수동)
+2. GCP 프로젝트, **예산 알림**, 상태 버킷(수동), `stacks/dns`로 서브도메인 존 생성과 가비아 NS 등록(한 번)
 3. `network`, `cloudsql`, `gke`, `iam`, `secrets` 모듈과 `stacks/gcp` (`services` 맵 포함)
 4. `kafka-self` 차트와 토픽 생성 Job, `topics.yaml` 초안
 5. 공통 차트 `dozy-service` 뼈대와 `releases/` 구조, `deploy.sh`

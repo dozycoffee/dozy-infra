@@ -16,6 +16,15 @@
     ]
   },
   {
+    "id": "infra-02b",
+    "name": "DNS 스택과 서브도메인 위임",
+    "description": "terraform/stacks/dns(+modules/dns)로 <이름>.dozy.kr Cloud DNS 존을 만들고 네임서버를 output으로 낸다. 가비아에 NS 레코드를 등록하고(한 번) dig로 위임을 확인한다. 가비아 NS 지원은 가정이므로 먼저 확인",
+    "status": "pending",
+    "dependencies": [
+      "infra-02"
+    ]
+  },
+  {
     "id": "infra-03",
     "name": "테라폼 network 모듈",
     "description": "VPC(custom), 서브넷과 보조 대역, Cloud Router, Cloud NAT, 방화벽, Private Service Access",
@@ -114,6 +123,16 @@
     "status": "pending",
     "dependencies": [
       "infra-07"
+    ]
+  },
+  {
+    "id": "infra-13",
+    "name": "Ingress, 도메인, TLS",
+    "description": "서비스별 호스트(<서비스>.<이름>.dozy.kr) 라우팅, 서비스 레코드(A), 인증서(구글 관리형 또는 cert-manager). /actuator/*는 노출하지 않는다",
+    "status": "pending",
+    "dependencies": [
+      "infra-02b",
+      "infra-06"
     ]
   }
 ]
