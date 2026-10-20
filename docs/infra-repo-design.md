@@ -400,7 +400,7 @@ topics:
 | 19 | TLS 인증서 연동 확인 | **구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정, 인증서 `ACTIVE` 확인(2026-10-20).** 남은 확인: Autopilot 외부 Ingress에서 certificate map 사용 가능 여부(안 되면 Gateway API), Certificate Manager 비용 |
 | 20 | inventory 이벤트 문서의 압축 요구 | 결정: 인프라가 `compact`로 선언(7.5절). inventory `docs/events.md`에 이 요구를 적을지(서비스 저장소 문서 작업) |
 | 21 | DLT 토픽 | `{원 토픽}.dlt`가 없을 때 서비스 동작 확인. 우선 `topics.yaml`에 선언 |
-| 22 | default VPC 삭제 | 프로젝트에 구글이 자동으로 만든 `default` 네트워크와 방화벽(`default-allow-ssh`, `default-allow-rdp`, `default-allow-icmp`, `default-allow-internal`)이 남아 있다(2026-10-20 확인). ssh와 rdp가 모든 곳(0.0.0.0/0)에서 열려 있는 규칙이다. 설계는 default VPC를 쓰지 않는다(상위 문서 4.3절). 사용하는 VM이 없으면 삭제하는 것을 권한다 |
+| 22 | default VPC 삭제 | **완료**(2026-10-20). 구글이 자동으로 만든 `default` 네트워크와 방화벽 4개(ssh, rdp가 0.0.0.0/0에 열려 있던 규칙 포함)를 삭제했다. 사용하는 자원이 없는 것을 먼저 확인했다 |
 
 ## 11. 구축 순서
 

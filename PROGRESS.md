@@ -34,7 +34,7 @@
 - `infra-03` 완료: `modules/network`(VPC `dozy-vpc`, 서브넷 `dozy-gke`·`dozy-ops`와 보조 대역, Cloud Router·NAT(고정 IP), 방화벽 2개, PSA)와 `stacks/gcp`. mock 테스트 16개(대역 겹침·잘못된 CIDR 거부 포함)를 두고, 변조로 실패하는 것도 확인했다(겹침 검사 변조는 Terraform이 상수 조건을 거부해 다른 방식으로 재확인).
 - 실제 `apply`(10개, 약 1분 44초)로 설계와 일치하는 것을 `gcloud`로 확인했고, `destroy`(10개, 약 1분 42초)가 PSA의 `ABANDON`으로 막히지 않고 끝나는 것도 확인했다. 남은 자원 없음, 상태 파일 비어 있음. 비용은 확인하지 못했다.
 - 아직 확인하지 못한 것: 헬스 체크 방화벽의 `destination_ranges`가 실제로 통과시키는지, 파드 대역이 NAT를 거치는지(GKE와 Ingress가 필요, `infra-04` 이후).
-- 프로젝트에 구글이 자동으로 만든 `default` VPC와 방화벽(ssh, rdp가 0.0.0.0/0에 열림)이 남아 있다. 설계 문서 10절 #22.
+- 프로젝트에 구글이 자동으로 만든 `default` VPC와 방화벽 4개(ssh, rdp가 0.0.0.0/0에 열림)를 삭제했다. 삭제 전에 VM, 로드밸런서, GKE, Cloud SQL, 라우터, 피어링이 없는 것을 확인했다. 설계 문서 10절 #22.
 - TLS 인증서는 구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정. 인증서는 `stacks/dns`에 둔다. Autopilot 외부 Ingress의 certificate map 지원과 비용은 확인 필요.
 
 ## 다음 세션에서 할 일
@@ -42,4 +42,3 @@
 1. 설계 문서의 결정 필요 항목을 차차 정한다(`docs/infra-repo-design.md` 10절). 먼저 Auth 프로필, 부하 테스트 토큰, 토픽 값.
 2. `terraform` 설치(README 0단계). 이후 `.tf` 파일을 추가하면 `scripts/verify.sh`가 terraform을 요구한다.
 3. `infra-04`: `cloudsql`, `gke`, `iam`, `secrets` 모듈과 `stacks/gcp` 확장. 비용이 큰 자원(GKE, Cloud SQL)이라 plan과 비용을 먼저 확인한다.
-4. 설계 문서 10절 #22(default VPC 삭제)를 결정한다.
