@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-- 저장소 뼈대, GCP 준비 절차(README), DNS 스택(`stacks/dns`)까지 있다(`infra-01`, `infra-02`, `infra-02b`, `infra-02c` 완료). 나머지 테라폼 모듈과 차트는 아직 없다.
+- 저장소 뼈대, GCP 준비 절차(README), DNS 스택(`stacks/dns`)까지 있다(`infra-01`, `infra-02`, `infra-02b`, `infra-02c`, `infra-03` 완료). `modules/network`(+`stacks/gcp`)까지 있고, 나머지 테라폼 모듈과 차트는 아직 없다. 지금 GCP에는 DNS 스택 자원만 있고 네트워크는 내려가 있다(올릴 때 `stacks/gcp`를 apply).
 - GCP 프로젝트 `dozy-jinwoo`, 상태 버킷 `dozy-jinwoo-tfstate`, `dozy.kr` DNS 존(`dozy-kr`)이 실제로 만들어져 있다. `dozy.kr`의 네임서버는 Cloud DNS(`ns-cloud-b1~b4`)다.
 - 인증서 `dozy-kr-wildcard`는 `ACTIVE`이고 `dozy.kr`, `*.dozy.kr` 모두 `AUTHORIZED`다.
 - 설계는 `docs/infra-repo-design.md`에 있고, 미결정·확인 필요 항목 19개가 남아 있다(특히 매니지드 Kafka 인증, 부하 테스트 토큰 방식, 토픽 값, ghcr 공개 여부).
@@ -31,10 +31,15 @@
 - 새 존의 네임서버 세트가 이전 존(`c`)과 달라(`b`) 가비아 네임서버 설정을 한 번 더 바꿨다. 반영 뒤 `.kr` 레지스트리가 `b1~b4`, `www.dozy.kr` 응답, HTTPS 200을 확인했다.
 - 인증서가 `ACTIVE`가 된 것까지 확인해 `infra-02c`를 완료했다.
 - 설계 문서 4.4절, README 7절, `CLAUDE.md` 규칙(네임서버 변경 전 기록 확인, 존 삭제 금지)을 이 내용으로 고쳤다.
+- `infra-03` 완료: `modules/network`(VPC `dozy-vpc`, 서브넷 `dozy-gke`·`dozy-ops`와 보조 대역, Cloud Router·NAT(고정 IP), 방화벽 2개, PSA)와 `stacks/gcp`. mock 테스트 16개(대역 겹침·잘못된 CIDR 거부 포함)를 두고, 변조로 실패하는 것도 확인했다(겹침 검사 변조는 Terraform이 상수 조건을 거부해 다른 방식으로 재확인).
+- 실제 `apply`(10개, 약 1분 44초)로 설계와 일치하는 것을 `gcloud`로 확인했고, `destroy`(10개, 약 1분 42초)가 PSA의 `ABANDON`으로 막히지 않고 끝나는 것도 확인했다. 남은 자원 없음, 상태 파일 비어 있음. 비용은 확인하지 못했다.
+- 아직 확인하지 못한 것: 헬스 체크 방화벽의 `destination_ranges`가 실제로 통과시키는지, 파드 대역이 NAT를 거치는지(GKE와 Ingress가 필요, `infra-04` 이후).
+- 프로젝트에 구글이 자동으로 만든 `default` VPC와 방화벽(ssh, rdp가 0.0.0.0/0에 열림)이 남아 있다. 설계 문서 10절 #22.
 - TLS 인증서는 구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정. 인증서는 `stacks/dns`에 둔다. Autopilot 외부 Ingress의 certificate map 지원과 비용은 확인 필요.
 
 ## 다음 세션에서 할 일
 
 1. 설계 문서의 결정 필요 항목을 차차 정한다(`docs/infra-repo-design.md` 10절). 먼저 Auth 프로필, 부하 테스트 토큰, 토픽 값.
 2. `terraform` 설치(README 0단계). 이후 `.tf` 파일을 추가하면 `scripts/verify.sh`가 terraform을 요구한다.
-3. `infra-03`: `network` 모듈 작성.
+3. `infra-04`: `cloudsql`, `gke`, `iam`, `secrets` 모듈과 `stacks/gcp` 확장. 비용이 큰 자원(GKE, Cloud SQL)이라 plan과 비용을 먼저 확인한다.
+4. 설계 문서 10절 #22(default VPC 삭제)를 결정한다.
