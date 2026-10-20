@@ -42,7 +42,7 @@ dozy-infra/
 │  │  ├─ cloudsql/            MySQL, PostgreSQL 인스턴스. services 맵을 읽어 DB와 계정 생성
 │  │  ├─ iam/                 서비스 계정, Workload Identity
 │  │  ├─ secrets/             Secret Manager 항목. services 맵을 읽어 껍데기 생성(값은 넣지 않음)
-│  │  ├─ dns/                 팀원별 서브도메인용 Cloud DNS 존, 서비스 레코드
+│  │  ├─ dns/                 도메인(dozy.kr)의 Cloud DNS 존, 기존 기록, 와일드카드 인증서
 │  │  └─ kafka-managed/       매니지드 Kafka. topics.yaml을 읽어 토픽 생성 (kafka_mode=managed일 때만)
 │  └─ stacks/
 │     ├─ dns/                 DNS 존만 만드는 루트 모듈 (오래 두는 스택, 4.4절)
@@ -106,7 +106,7 @@ dozy-infra/
 | 자원 이름 접두사 | `terraform.tfvars` | 이름 충돌 방지 |
 | `kafka_mode` | `terraform.tfvars` | `self` 또는 `managed`. 기본 `self` |
 | 접근 허용 IP (컨트롤 플레인) | `terraform.tfvars` | 본인 IP |
-| 서브도메인 | `terraform.tfvars` (`domain = "<이름>.dozy.kr"`) | 비우면 외부 IP로 접근. [4.4절](#44-도메인과-dns) |
+| 도메인 | `terraform.tfvars` (`domain = "dozy.kr"`) | 도메인은 한 사람이 쓴다. 다른 팀원은 도메인 없이(IP로) 올린다. [4.4절](#44-도메인과-dns) |
 | 비밀값 | Secret Manager | 값은 각자 `gcloud`로 넣는다. 파일이나 저장소에 두지 않는다 |
 
 ### 4.2 상태(state) 분리
@@ -121,51 +121,46 @@ Cloud SQL의 프라이빗 IP, 매니지드 Kafka 주소 같은 값은 테라폼�
 
 ### 4.4 도메인과 DNS
 
-도메인 `dozy.kr`은 가비아에서 샀고 DNS도 가비아가 관리한다. 팀원이 각자 환경을 올려도 도메인 하나로 충분하도록, **팀원마다 서브도메인 하나를 가비아에서 그 팀원의 Cloud DNS 존으로 위임**한다.
-
-현재 상태(2026-10-15 공개 DNS 조회):
-
-| 이름 | 상태 |
-|---|---|
-| `www.dozy.kr` | Vercel을 가리킨다(기존 홈페이지). **건드리지 않는다** |
-| `dozy.kr` (루트) | A 레코드 없음 |
-| `auth.`, `api.`, `admin.` 등 | 비어 있음 |
+`dozy.kr`은 가비아에서 샀다. 도메인은 한 사람이 쓰므로 **도메인 전체의 DNS를 GCP Cloud DNS로 옮겨 관리한다.** 가비아는 도메인 등록만 맡고, 가비아의 네임서버 설정이 Cloud DNS를 가리킨다. 팀원별 서브도메인 위임 방식은 쓰지 않는다(2026-10-20 요구사항 변경으로 폐기). 도메인을 쓰지 않는 팀원은 도메인 없이(IP로) 올린다.
 
 ```
-dozy.kr (가비아 DNS)
-├─ www.dozy.kr               → Vercel (기존 홈페이지)
-├─ jinwoo.dozy.kr    NS 위임 → 진우의 Cloud DNS 존
-│    ├─ auth.jinwoo.dozy.kr       → 진우 로드밸런서 IP
-│    ├─ catalog.jinwoo.dozy.kr    → 같은 IP (Ingress가 이름으로 서비스를 나눔)
-│    └─ ...
-└─ <이름>.dozy.kr    NS 위임 → 그 팀원의 Cloud DNS 존
+dozy.kr  (가비아에 등록, 네임서버 = Cloud DNS)
+└─ Cloud DNS 존 dozy-kr   (stacks/dns, 오래 둠)
+   ├─ www.dozy.kr                CNAME → Vercel   (기존 홈페이지. records.tf)
+   ├─ _acme-challenge.dozy.kr    CNAME → 인증서 소유 확인 (모듈이 만듦)
+   └─ auth.dozy.kr, catalog.dozy.kr ...   A → 로드밸런서 (stacks/gcp가 만듦)
 ```
 
-**이름 규칙:** `<서비스>.<팀원이름>.dozy.kr` (예: `auth.jinwoo.dozy.kr`, `admin.jinwoo.dozy.kr`). 콘솔과 auth는 같은 사이트(`dozy.kr`) 아래라서 refresh 쿠키 조건을 지킨다.
+**이름 규칙:** `<서비스>.dozy.kr` (예: `auth.dozy.kr`, `admin.dozy.kr`). 콘솔과 auth가 같은 사이트(`dozy.kr`) 아래라서 refresh 쿠키 조건을 지킨다.
 
-**존은 오래 두는 별도 스택으로 만든다.** `terraform destroy`로 존을 지우면 다시 만들 때 네임서버가 달라져서 가비아의 NS 레코드를 매번 다시 고쳐야 한다. 그래서 존만 `stacks/dns`로 분리하고 올리고 내리는 `stacks/gcp`와 상태를 따로 둔다. 존은 소액이라 계속 두는 것이 낫다(금액은 가격표로 확인).
+**기존 기록은 코드로 관리한다.** 가비아에서 옮겨 온 기록은 `terraform/stacks/dns/records.tf`의 `records`에 둔다. 현재는 `www` → Vercel 하나뿐이다(2026-10-20 가비아 DNS 확인, 다른 기록 없음).
 
 | 스택 | 만드는 것 | 수명 |
 |---|---|---|
-| `stacks/dns` | Cloud DNS 존(`<이름>.dozy.kr`), 인증서 소유 확인용 DNS 인증 레코드, 와일드카드 인증서, certificate map | 오래 둠. `down.sh`가 건드리지 않는다 |
+| `stacks/dns` | Cloud DNS 존(`dozy.kr`), 기존 기록, 인증서 소유 확인용 DNS 인증 레코드, 와일드카드 인증서, certificate map | 오래 둠. `down.sh`가 건드리지 않는다 |
 | `stacks/gcp` | 나머지 자원과 **서비스 레코드**(A). Ingress가 `stacks/dns`의 certificate map을 붙인다 | 올리고 내림. destroy 때 레코드도 지워진다 |
 
-**팀원이 처음 한 번 하는 일:**
+**네임서버 이전 (한 번, 2026-10-20 완료):**
 
 ```
-1. stacks/dns apply          → output: 이 존의 네임서버 4개
-2. 도메인 소유자에게 전달      → 가비아에서 <이름>.dozy.kr 의 NS 레코드로 등록 (한 번만)
-3. dig NS <이름>.dozy.kr 로 위임 확인
+1. stacks/dns apply            → output: 이 존의 네임서버 4개 (이번에는 ns-cloud-b1~b4)
+2. 가비아 "네임서버 설정"의 값을 이 4개로 교체
+3. dig +norecurse NS dozy.kr @g.dns.kr 로 .kr 레지스트리에 반영됐는지 확인
 ```
 
-이후에는 `up.sh`/`down.sh`만 쓰면 된다. 가비아에서 NS 레코드 추가가 되는지는 **확인하지 않은 가정**이다([10절](#10-미결정확인-필요-항목) #18).
+가비아에는 비슷한 두 메뉴가 있고 **쓰는 곳이 다르다.** 네임서버 설정은 도메인 전체의 DNS 관리를 넘기는 곳(이번에 쓰는 곳)이고, DNS 레코드 추가는 가비아 DNS 안에 기록을 만드는 곳이다.
 
-**TLS 인증서: 구글 관리형(Certificate Manager)으로 결정.** 도메인 소유 확인은 DNS 인증(CNAME 레코드 하나)으로 하므로 **로드밸런서가 없어도 미리 발급**할 수 있다. 와일드카드 인증서(`*.<이름>.dozy.kr`) 한 장을 `stacks/dns`에 두고, 올릴 때마다 Ingress가 certificate map으로 가져다 붙인다. 이렇게 하면 올리고 내릴 때 재발급 대기가 없고, cert-manager와 달리 팀원이 `dozy.kr` 하나를 공유해도 Let's Encrypt의 도메인 단위 발급 제한을 함께 소진하지 않는다. cert-manager는 인증서 자동화를 학습하는 별도 실습으로 나중에 얹는다.
+**사고와 교훈 (2026-10-20):**
 
-아래는 **확인하지 않은 가정**이다([10절](#10-미결정확인-필요-항목) #19).
+- 서브도메인 위임을 하려고 했는데 값 4개를 가비아의 도메인 **네임서버 설정**에 넣어서, GCP에 `dozy.kr` 존이 없는 채로 도메인 전체가 GCP로 넘어갔다. `www.dozy.kr`이 `SERVFAIL`이 되어 홈페이지가 끊겼다. `dozy.kr` 존과 `www` 기록을 GCP에 만들고 네임서버를 새 존의 값으로 맞춰 복구했다.
+- 네임서버를 바꾸기 **전에** 가비아 DNS의 기존 기록을 모두 `records.tf`에 옮겼는지 확인한다. 빠지면 그 기록의 서비스가 끊긴다.
+- Cloud DNS는 존마다 네임서버 세트(`a`, `b`, `c`…)를 자동 배정하고 고를 수 없다. 존을 지우고 다시 만들면 세트가 바뀔 수 있다(이번에 `c` → `b`). 그러면 가비아 네임서버 설정을 다시 바꿔야 한다. 그래서 존을 별도 스택으로 오래 둔다.
+- `.kr` 레지스트리는 가비아의 변경을 즉시 반영하지 않는다. 확인할 때는 공개 리졸버가 아니라 `g.dns.kr` 같은 `.kr` 서버에 직접 묻는다.
 
-- GKE Autopilot의 외부 Ingress에서 certificate map을 붙일 수 있는지(안 되면 Gateway API로 간다)
-- Certificate Manager의 비용(가격표로 확인)
+**TLS 인증서: 구글 관리형(Certificate Manager)으로 결정.** 도메인 소유 확인은 DNS 인증(CNAME 레코드 하나)으로 하므로 **로드밸런서가 없어도 미리 발급**할 수 있다. 와일드카드 인증서(`dozy.kr`, `*.dozy.kr`) 한 장을 `stacks/dns`에 두고, 올릴 때마다 Ingress가 certificate map으로 가져다 붙인다. 이렇게 하면 올리고 내릴 때 재발급 대기가 없다. cert-manager는 인증서 자동화를 학습하는 별도 실습으로 나중에 얹는다. `www.dozy.kr`은 Vercel이 자체 인증서로 서비스하므로 이 인증서와 무관하다.
+
+- 확인됨: certificate map 항목의 와일드카드 호스트(`*.dozy.kr`)를 GCP가 받아들인다(apply 성공). 네임서버 이전 뒤 인증서가 `ACTIVE`가 되었고 `dozy.kr`, `*.dozy.kr` 모두 `AUTHORIZED`다(2026-10-20).
+- **확인하지 않은 가정**([10절](#10-미결정확인-필요-항목) #19): GKE Autopilot의 외부 Ingress에서 certificate map을 붙일 수 있는지(안 되면 Gateway API), Certificate Manager의 비용(가격표로 확인)
 
 ## 5. 서비스 추가 방식
 
@@ -401,15 +396,15 @@ topics:
 | 15 | JWKS 조회 경로 | 상위 문서 미결정 #5와 같다. `AUTH_ISSUER_BASE_URI`를 어떤 주소로 줄지 결정이 선행된다 |
 | 16 | 비밀값 주입 방식 | External Secrets Operator와 CSI 드라이버 중 선택 (상위 문서 7절) |
 | 17 | 공통 차트 범위 | auth는 서명 키 볼륨과 replicas 1 고정이 있어 공통 차트로 충분한지, 예외가 되는지 |
-| 18 | 가비아 NS 레코드 | 서브도메인 위임에 가비아 DNS의 NS 레코드 추가가 되는지 **가정**했다. 안 되면 팀원별 A 레코드를 가비아에서 직접 추가하고 고정 IP를 예약하는 방식으로 바꾼다 |
-| 19 | TLS 인증서 연동 확인 | **구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정.** 남은 확인: Autopilot 외부 Ingress에서 certificate map 사용 가능 여부(안 되면 Gateway API), Certificate Manager 비용 |
+| 18 | 도메인 네임서버 이전 | **완료**(2026-10-20). 서브도메인 위임 대신 `dozy.kr` 전체를 Cloud DNS로 이전했다. 존을 다시 만들면 네임서버 세트가 바뀔 수 있다(4.4절) |
+| 19 | TLS 인증서 연동 확인 | **구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정, 인증서 `ACTIVE` 확인(2026-10-20).** 남은 확인: Autopilot 외부 Ingress에서 certificate map 사용 가능 여부(안 되면 Gateway API), Certificate Manager 비용 |
 | 20 | inventory 이벤트 문서의 압축 요구 | 결정: 인프라가 `compact`로 선언(7.5절). inventory `docs/events.md`에 이 요구를 적을지(서비스 저장소 문서 작업) |
 | 21 | DLT 토픽 | `{원 토픽}.dlt`가 없을 때 서비스 동작 확인. 우선 `topics.yaml`에 선언 |
 
 ## 11. 구축 순서
 
 1. `dozy-infra` 저장소 뼈대 (완료)
-2. GCP 프로젝트, **예산 알림**, 상태 버킷(수동), `stacks/dns`로 서브도메인 존 생성과 가비아 NS 등록(한 번)
+2. GCP 프로젝트, **예산 알림**, 상태 버킷(수동), `stacks/dns`로 `dozy.kr` 존 생성과 가비아 네임서버 변경(한 번)
 3. `network`, `cloudsql`, `gke`, `iam`, `secrets` 모듈과 `stacks/gcp` (`services` 맵 포함)
 4. `kafka-self` 차트와 토픽 생성 Job, `topics.yaml` 초안
 5. 공통 차트 `dozy-service` 뼈대와 `releases/` 구조, `deploy.sh`

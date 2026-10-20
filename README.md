@@ -2,7 +2,7 @@
 
 Dozy 서비스를 GCP(GKE Autopilot)에 올리는 인프라 저장소다. 테라폼으로 클라우드 자원을, 공통 Helm 차트로 서비스를 배포한다.
 
-> 학습용 프로젝트이며 구축 중이다. 현재는 뼈대만 있고 테라폼과 매니페스트는 아직 없다. 진행 상황은 [PROGRESS.md](PROGRESS.md), 작업 목록은 [feature_list.json](feature_list.json)에 있다.
+> 학습용 프로젝트이며 구축 중이다. 현재는 DNS 스택(`terraform/stacks/dns`)까지 있고, 나머지 테라폼 모듈과 Helm 차트는 아직 없다. 진행 상황은 [PROGRESS.md](PROGRESS.md), 작업 목록은 [feature_list.json](feature_list.json)에 있다.
 
 ## 문서
 
@@ -128,11 +128,13 @@ gcloud storage buckets describe "gs://${STATE_BUCKET}" --format="value(versionin
 
 ### 7. DNS 스택 올리기 (한 번)
 
-서브도메인 DNS 존과 와일드카드 인증서를 만든다. 오래 두는 스택이라 `down.sh`가 지우지 않는다. 설계는 [설계 문서 4.4절](docs/infra-repo-design.md#44-도메인과-dns)에 있다.
+`dozy.kr`의 DNS 존, 기존 기록, 와일드카드 인증서를 만든다. 오래 두는 스택이라 `down.sh`가 지우지 않고, **존을 지우고 다시 만들지 않는다**(네임서버가 바뀔 수 있다). 설계는 [설계 문서 4.4절](docs/infra-repo-design.md#44-도메인과-dns)에 있다.
+
+> **먼저 확인:** 가비아 DNS 관리의 기존 기록이 모두 `terraform/stacks/dns/records.tf`에 있어야 한다. 네임서버를 바꾸면 `dozy.kr` 전체가 GCP로 넘어가므로, 빠진 기록은 끊긴다. 현재 기록은 `www` → Vercel 하나다.
 
 ```bash
 cd terraform/stacks/dns
-cp terraform.tfvars.example terraform.tfvars   # project_id, domain(<이름>.dozy.kr)을 채운다
+cp terraform.tfvars.example terraform.tfvars   # project_id, domain(dozy.kr)을 채운다
 
 terraform init \
   -backend-config="bucket=${STATE_BUCKET}" \
@@ -142,15 +144,25 @@ terraform apply
 terraform output name_servers
 ```
 
-1. `terraform output name_servers`로 나온 네임서버 4개를 **도메인 소유자에게 전달**한다.
-2. 도메인 소유자가 가비아 DNS 관리에서 `<이름>.dozy.kr`의 **NS 레코드**로 등록한다(호스트는 `<이름>`, 값은 네임서버 4개). `www`와 다른 기존 레코드는 건드리지 않는다.
-3. 위임이 되었는지 확인한다.
+1. `apply`가 끝나면 `www` 같은 기록이 새 존에 있는지 확인한다. 새 네임서버가 응답해야 한다.
 
 ```bash
-dig +short NS <이름>.dozy.kr
+dig +norecurse A www.dozy.kr @<output의 네임서버 하나>   # CNAME이 보여야 한다
 ```
 
-네임서버가 보이면 위임이 된 것이다. 인증서는 이 위임이 끝나야 발급되며(상태가 `PROVISIONING`에서 `ACTIVE`로 바뀜), 콘솔의 Certificate Manager에서 확인한다. 가비아가 NS 레코드 추가를 지원하는지는 **확인하지 않은 가정**이다.
+2. 가비아의 **네임서버 설정**(도메인 전체)에 `terraform output name_servers`의 값 4개를 넣는다. 기존 값은 지우고 교체한다. 가비아의 **DNS 레코드 추가** 메뉴가 아니다. 이 단계는 존이 준비된 **뒤에** 해야 한다. 존이 없는 채로 바꾸면 홈페이지가 끊긴다.
+3. `.kr` 레지스트리에 반영되었는지 확인한다. 반영에 시간이 걸릴 수 있다(이번에는 가비아 저장 뒤 몇 분에서 수십 분). 공개 리졸버는 캐시 때문에 늦게 바뀐다.
+
+```bash
+dig +norecurse NS dozy.kr @g.dns.kr    # 새 네임서버 4개가 보여야 한다
+curl -sS -o /dev/null -w "%{http_code}\n" https://www.dozy.kr   # 200
+```
+
+인증서는 이 반영이 끝난 뒤 구글이 소유 확인을 하면서 `PROVISIONING`에서 `ACTIVE`로 바뀐다(2026-10-20 실제로 `ACTIVE`가 되었다). 콘솔의 Certificate Manager 또는 아래 명령으로 확인한다.
+
+```bash
+gcloud certificate-manager certificates describe dozy-kr-wildcard --location=global --format="value(managed.state)"
+```
 
 `terraform apply`는 실제 자원(DNS 존, 인증서)을 만든다. 존은 소액이지만 상시 과금이므로 쓰지 않을 때도 유지하는 자원임을 알고 시작한다.
 

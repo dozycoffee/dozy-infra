@@ -18,7 +18,7 @@
   {
     "id": "infra-02b",
     "name": "DNS 스택 코드(modules/dns, stacks/dns)",
-    "description": "terraform/stacks/dns(+modules/dns): <이름>.dozy.kr Cloud DNS 존, Certificate Manager DNS 인증 레코드, 와일드카드 인증서, certificate map. mock provider 테스트 포함. 실제 apply와 가비아 NS 등록은 infra-02c",
+    "description": "terraform/stacks/dns(+modules/dns): dozy.kr Cloud DNS 존, 기존 기록(records.tf), Certificate Manager DNS 인증 레코드, 와일드카드 인증서, certificate map. mock provider 테스트 포함",
     "status": "completed",
     "dependencies": [
       "infra-02"
@@ -26,9 +26,9 @@
   },
   {
     "id": "infra-02c",
-    "name": "DNS 스택 apply와 가비아 NS 위임(수동)",
-    "description": "각 팀원이 README 7절대로 stacks/dns를 apply하고, 네임서버를 도메인 소유자에게 전달해 가비아에 NS를 등록하고, dig로 위임과 인증서 ACTIVE를 확인한다. 가비아 NS 지원은 가정이므로 먼저 확인한다",
-    "status": "pending",
+    "name": "DNS 스택 apply와 가비아 네임서버 이전(수동)",
+    "description": "stacks/dns를 apply하고, 가비아의 네임서버 설정을 output의 네임서버로 교체하고, .kr 레지스트리 반영과 www 정상 응답, 인증서 ACTIVE를 확인한다. 2026-10-20 모두 완료",
+    "status": "completed",
     "dependencies": [
       "infra-02b"
     ]
@@ -137,7 +137,7 @@
   {
     "id": "infra-13",
     "name": "Ingress, 도메인, TLS",
-    "description": "서비스별 호스트(<서비스>.<이름>.dozy.kr) 라우팅, 서비스 레코드(A), stacks/dns의 certificate map 연결. Autopilot 외부 Ingress에서 certificate map이 안 되면 Gateway API로 전환. /actuator/*는 노출하지 않는다",
+    "description": "서비스별 호스트(<서비스>.dozy.kr) 라우팅, 서비스 레코드(A), stacks/dns의 certificate map 연결. Autopilot 외부 Ingress에서 certificate map이 안 되면 Gateway API로 전환. /actuator/*는 노출하지 않는다",
     "status": "pending",
     "dependencies": [
       "infra-02c",

@@ -35,6 +35,7 @@ scripts/             verify.sh, up.sh, down.sh, deploy.sh, render-config.sh
 - 새 서비스는 `services` 맵, `releases/<서비스>.yaml`, `releases/index.yaml`(, `topics.yaml`) 추가로 끝나야 한다. 서비스 때문에 공통 차트나 모듈을 고쳐야 하면 설계를 먼저 의심한다.
 - 클라우드에서는 `local` 프로필을 쓰지 않는다. 릴리스 전 서비스는 `sha-` 태그로 고정하고 `latest`, `main` 태그는 쓰지 않는다.
 - 내릴 때는 `down.sh` 순서(쿠버네티스 리소스 삭제 → 남은 LB·디스크 확인 → `terraform destroy`)를 지킨다. 순서를 건너뛰면 비용이 계속 나간다.
+- 도메인의 네임서버(가비아 "네임서버 설정")를 바꾸기 전에 가비아 DNS의 기존 기록이 모두 `terraform/stacks/dns/records.tf`에 있는지 확인한다. 빠지면 도메인 전체가 끊긴다(2026-10-20 사고, 설계 문서 4.4절). DNS 존을 지우고 다시 만들면 네임서버가 바뀔 수 있으므로 존은 지우지 않는다.
 - 새 클라우드 자원을 추가할 때는 상시 과금 여부를 PR 설명에 적는다.
 - 확인하지 않은 사실(매니지드 Kafka 인증 방식 등)은 단정하지 않고 `docs/infra-repo-design.md`의 미결정 항목에 기록한다.
 
