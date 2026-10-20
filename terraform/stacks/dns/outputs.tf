@@ -1,5 +1,5 @@
 output "name_servers" {
-  description = "도메인 소유자가 가비아에 NS 레코드로 등록할 네임서버"
+  description = "가비아의 네임서버 설정에 넣을 이 존의 네임서버"
   value       = module.dns.name_servers
 }
 
@@ -11,12 +11,4 @@ output "zone_name" {
 output "certificate_map_name" {
   description = "Ingress가 붙일 certificate map 이름"
   value       = module.dns.certificate_map_name
-}
-
-output "gabia_ns_records" {
-  description = "가비아에 등록할 NS 레코드 (호스트: 서브도메인 이름, 값: 네임서버)"
-  value = {
-    host        = split(".", var.domain)[0]
-    name_server = module.dns.name_servers
-  }
 }

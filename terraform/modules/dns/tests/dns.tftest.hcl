@@ -142,3 +142,86 @@ run "too_long_domain_is_rejected" {
 
   expect_failures = [var.domain]
 }
+
+run "root_domain_zone_and_records" {
+  command = apply
+
+  variables {
+    domain = "dozy.kr"
+    records = {
+      www = { type = "CNAME", ttl = 600, rrdatas = ["example.vercel-dns-017.com."] }
+    }
+  }
+
+  assert {
+    condition     = google_dns_managed_zone.this.name == "dozy-kr" && google_dns_managed_zone.this.dns_name == "dozy.kr."
+    error_message = "루트 도메인도 존 이름과 dns_name이 맞아야 한다."
+  }
+
+  assert {
+    condition     = google_dns_record_set.records["www"].name == "www.dozy.kr."
+    error_message = "기록 이름은 도메인 아래의 FQDN이어야 한다."
+  }
+
+  assert {
+    condition     = google_dns_record_set.records["www"].type == "CNAME" && google_dns_record_set.records["www"].ttl == 600
+    error_message = "기록의 타입과 TTL이 입력대로여야 한다."
+  }
+
+  assert {
+    condition     = google_dns_record_set.records["www"].rrdatas == tolist(["example.vercel-dns-017.com."])
+    error_message = "기록 값이 입력대로여야 한다."
+  }
+
+  assert {
+    condition     = google_dns_record_set.records["www"].managed_zone == "dozy-kr"
+    error_message = "기록은 이 모듈의 존에 만들어져야 한다."
+  }
+
+  assert {
+    condition     = contains(google_certificate_manager_certificate.wildcard.managed[0].domains, "*.dozy.kr")
+    error_message = "루트 도메인의 와일드카드 인증서가 만들어져야 한다."
+  }
+}
+
+run "apex_record_uses_domain_itself" {
+  command = apply
+
+  variables {
+    domain = "dozy.kr"
+    records = {
+      "@" = { type = "A", rrdatas = ["203.0.113.10"] }
+    }
+  }
+
+  assert {
+    condition     = google_dns_record_set.records["@"].name == "dozy.kr."
+    error_message = "키가 @이면 도메인 자체의 기록이어야 한다."
+  }
+
+  assert {
+    condition     = google_dns_record_set.records["@"].ttl == 300
+    error_message = "TTL을 생략하면 기본값 300이어야 한다."
+  }
+}
+
+run "no_records_by_default" {
+  command = apply
+
+  assert {
+    condition     = length(google_dns_record_set.records) == 0
+    error_message = "records를 주지 않으면 추가 기록을 만들지 않아야 한다."
+  }
+}
+
+run "empty_rrdatas_is_rejected" {
+  command = plan
+
+  variables {
+    records = {
+      www = { type = "CNAME", rrdatas = [] }
+    }
+  }
+
+  expect_failures = [var.records]
+}

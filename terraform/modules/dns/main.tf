@@ -1,5 +1,5 @@
-# 팀원 서브도메인의 DNS 존과 와일드카드 인증서.
-# 오래 두는 스택(stacks/dns)에서만 쓴다. 존을 지우면 네임서버가 바뀌어 가비아의 NS 레코드를 다시 등록해야 한다.
+# 도메인의 DNS 존과 와일드카드 인증서.
+# 오래 두는 스택(stacks/dns)에서만 쓴다. 존을 지우면 네임서버가 바뀌어 가비아의 네임서버 설정을 다시 바꿔야 한다.
 
 locals {
   zone_name = replace(var.domain, ".", "-")
@@ -12,7 +12,7 @@ resource "google_dns_managed_zone" "this" {
   project     = var.project_id
   name        = local.zone_name
   dns_name    = "${var.domain}."
-  description = "Dozy 서브도메인 존 (${var.domain})"
+  description = "Dozy DNS 존 (${var.domain})"
   visibility  = "public"
 }
 
@@ -56,4 +56,15 @@ resource "google_certificate_manager_certificate_map_entry" "wildcard" {
   map          = google_certificate_manager_certificate_map.this.name
   certificates = [google_certificate_manager_certificate.wildcard.id]
   hostname     = "*.${var.domain}"
+}
+
+resource "google_dns_record_set" "records" {
+  for_each = var.records
+
+  project      = var.project_id
+  managed_zone = google_dns_managed_zone.this.name
+  name         = each.key == "@" ? "${var.domain}." : "${each.key}.${var.domain}."
+  type         = each.value.type
+  ttl          = each.value.ttl
+  rrdatas      = each.value.rrdatas
 }

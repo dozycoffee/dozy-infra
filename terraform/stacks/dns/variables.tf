@@ -10,6 +10,6 @@ variable "region" {
 }
 
 variable "domain" {
-  description = "팀원 서브도메인. 끝에 점을 붙이지 않는다. 예: jinwoo.dozy.kr"
+  description = "DNS 존으로 관리할 도메인. 끝에 점을 붙이지 않는다. 예: dozy.kr"
   type        = string
 }

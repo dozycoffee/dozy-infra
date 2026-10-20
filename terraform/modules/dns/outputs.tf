@@ -1,5 +1,5 @@
 output "name_servers" {
-  description = "이 존의 네임서버. 도메인 소유자가 가비아에 이 값으로 NS 레코드를 등록한다."
+  description = "이 존의 네임서버. 가비아의 도메인 네임서버 설정에 이 값을 넣는다."
   value       = google_dns_managed_zone.this.name_servers
 }
 
