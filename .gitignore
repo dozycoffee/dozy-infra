@@ -18,7 +18,8 @@ k8s/overlays/*/generated/
 .env
 .env.*
 !.env.example
-secrets/
+# 저장소 최상위의 비밀 폴더만 제외한다(terraform/modules/secrets 같은 모듈은 커밋 대상)
+/secrets/
 
 # 개인 설정
 CLAUDE.local.md
