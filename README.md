@@ -23,7 +23,7 @@ Dozy 서비스를 GCP(GKE Autopilot)에 올리는 인프라 저장소다. 테라
 
 팀원마다 **자기 GCP 프로젝트**에 올린다. 아래는 각자 한 번만 하는 수동 절차이고, 이후 자원은 테라폼이 만든다. 명령의 `<...>`는 자기 값으로 바꾼다.
 
-> `gcloud` 명령과 옵션 이름은 `gcloud <명령> --help`로 확인했지만, 실제 프로젝트에서 실행해 보지는 않았다. API 목록(초안, 테라폼 모듈을 만들면서 확정), `brew` 설치 명령, GKE 플러그인 설치 명령은 확인하지 않았다. 동작이 다르면 먼저 `--help`를 따른다.
+> `gcloud` 명령과 옵션 이름은 `gcloud <명령> --help`로 확인했고, 프로젝트 생성부터 버킷, API 켜기, GKE 플러그인 설치까지 실제 프로젝트에서 실행했다(2026-10-26). `brew` 설치 명령은 확인하지 않았다. 동작이 다르면 먼저 `--help`를 따른다.
 
 ### 0. 도구 설치
 
@@ -36,6 +36,8 @@ Dozy 서비스를 GCP(GKE Autopilot)에 올리는 인프라 저장소다. 테라
 | terraform | `brew tap hashicorp/tap && brew install hashicorp/tap/terraform` |
 
 `brew install terraform`은 오래된 버전에 멈춰 있을 수 있어 HashiCorp tap을 쓴다. 테라폼 버전은 코드의 `required_version`으로 고정할 예정이다.
+
+`gke-gcloud-auth-plugin`은 Homebrew로 설치한 gcloud에서 `gcloud components install`로 설치되지만 `PATH`에 없는 `$(gcloud info --format="value(installation.sdk_root)")/bin`에 놓인다(2026-10-26 확인). 이 경로를 `PATH`에 추가해야 `kubectl`이 클러스터에 접속한다. 추가하지 않으면 `kubectl`이 `gke-gcloud-auth-plugin not found`로 실패한다.
 
 ### 1. 로그인
 

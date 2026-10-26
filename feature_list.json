@@ -45,10 +45,19 @@
   {
     "id": "infra-04",
     "name": "테라폼 cloudsql, gke, iam, secrets 모듈과 stacks/gcp",
-    "description": "Cloud SQL(MySQL, PostgreSQL), GKE Autopilot, Workload Identity, Secret Manager 껍데기. services 맵으로 DB와 계정, 비밀값을 만든다. 루트 모듈과 terraform.tfvars.example",
-    "status": "pending",
+    "description": "modules/iam, secrets, cloudsql, gke와 stacks/gcp 연결(services 맵). mock 테스트 총 36개. 2026-10-26 실제 apply(49개, 약 13분)와 destroy(49개, 약 8분)로 생성, 설계 일치, 삭제 경로를 확인했고 kubectl 접속도 확인했다. 남은 문제(GKE 노드가 만들어지지 않음)는 infra-04b, PostgreSQL 사용자 권한은 infra-06에서 Flyway로 확인한다",
+    "status": "completed",
     "dependencies": [
       "infra-03"
+    ]
+  },
+  {
+    "id": "infra-04b",
+    "name": "GKE 노드가 만들어지지 않는 문제 해결",
+    "description": "Autopilot 클러스터가 RUNNING인데 28분 동안 노드가 0개였고 시스템 파드가 FailedScheduling이었다(원인 미상). 네트워크, IAM, GKE만 -target으로 올려 가설을 하나씩 확인한다: (1) 노드 서비스 계정에 roles/container.defaultNodeServiceAccount 추가, (2) 노드 서비스 계정을 지정하지 않고(기본 Compute 서비스 계정) 노드가 생기는지로 범위 좁히기. 해결되면 모듈과 테스트에 반영한다",
+    "status": "pending",
+    "dependencies": [
+      "infra-04"
     ]
   },
   {
@@ -57,7 +66,8 @@
     "description": "charts/kafka-self(StatefulSet, 헤드리스 Service, PVC, 토픽 생성 Job)와 topics/topics.yaml. 브로커 토픽 자동 생성은 끈다. advertised.listeners는 내부 DNS와 일치시킨다",
     "status": "pending",
     "dependencies": [
-      "infra-04"
+      "infra-04",
+      "infra-04b"
     ]
   },
   {
@@ -66,7 +76,8 @@
     "description": "charts/dozy-service(Deployment, Service, ConfigMap, ExternalSecret, probe, HPA, PDB, NetworkPolicy, Ingress), releases/(index, common, 서비스별 values), deploy.sh, render-config.sh. 클라우드에서 local 프로필을 막는 검사 포함",
     "status": "pending",
     "dependencies": [
-      "infra-04"
+      "infra-04",
+      "infra-04b"
     ]
   },
   {
