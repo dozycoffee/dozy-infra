@@ -2,6 +2,8 @@
 # 기본 Compute 서비스 계정은 편집자 권한이라 노드에 쓰지 않는다.
 
 locals {
+  workload_pool = coalesce(var.workload_pool, "${var.project_id}.svc.id.goog")
+
   workload_role_pairs = merge([
     for key, w in var.workload_identities : {
       for role in w.roles : "${key}/${role}" => { key = key, role = role }
@@ -37,7 +39,7 @@ resource "google_service_account_iam_member" "workload_identity" {
 
   service_account_id = google_service_account.workload[each.key].name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[${each.value.namespace}/${each.value.ksa_name}]"
+  member             = "serviceAccount:${local.workload_pool}[${each.value.namespace}/${each.value.ksa_name}]"
 }
 
 resource "google_project_iam_member" "workload" {

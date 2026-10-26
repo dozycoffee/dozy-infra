@@ -26,6 +26,12 @@ variable "node_roles" {
   ]
 }
 
+variable "workload_pool" {
+  description = "Workload Identity 풀(<프로젝트>.svc.id.goog). 이 풀은 GKE 클러스터가 만들어질 때 생기므로, 클러스터 모듈의 출력을 넘겨 바인딩이 클러스터 뒤에 만들어지게 한다. 비우면 기본 이름을 쓴다."
+  type        = string
+  default     = null
+}
+
 variable "workload_identities" {
   description = "Workload Identity로 클라우드 API를 쓰는 워크로드. 키는 서비스 계정 이름 일부(예: eso)이고 ksa_name은 쿠버네티스 서비스 계정 이름이다."
   type = map(object({

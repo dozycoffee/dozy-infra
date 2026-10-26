@@ -12,6 +12,9 @@ module "iam" {
 
   project_id = var.project_id
 
+  # 풀은 GKE 클러스터가 만들어질 때 생긴다. 클러스터 모듈의 출력을 받아 바인딩이 클러스터 뒤에 만들어지게 한다.
+  workload_pool = module.gke.workload_pool
+
   # 비밀값 주입 방식이 External Secrets Operator라는 전제다(설계 문서 미결정 #16). CSI 드라이버로 바꾸면 이 항목을 고친다.
   workload_identities = {
     eso = {

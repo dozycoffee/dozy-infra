@@ -14,8 +14,9 @@ output "cluster_endpoint" {
 }
 
 output "workload_pool" {
-  description = "Workload Identity 풀 (<프로젝트>.svc.id.goog)"
+  description = "Workload Identity 풀 (<프로젝트>.svc.id.goog). 풀은 클러스터가 만들어질 때 생기므로 클러스터 뒤에 쓰이도록 의존성을 건다."
   value       = "${var.project_id}.svc.id.goog"
+  depends_on  = [google_container_cluster.this]
 }
 
 output "get_credentials_command" {

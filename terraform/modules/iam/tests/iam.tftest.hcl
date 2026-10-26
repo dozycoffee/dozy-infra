@@ -107,3 +107,23 @@ run "long_name_is_rejected" {
 
   expect_failures = [var.name]
 }
+
+run "workload_pool_input_is_used_for_the_binding" {
+  command = apply
+
+  variables {
+    workload_pool = "pool-from-cluster.svc.id.goog"
+    workload_identities = {
+      eso = {
+        namespace = "external-secrets"
+        ksa_name  = "external-secrets"
+        roles     = []
+      }
+    }
+  }
+
+  assert {
+    condition     = google_service_account_iam_member.workload_identity["eso"].member == "serviceAccount:pool-from-cluster.svc.id.goog[external-secrets/external-secrets]"
+    error_message = "넘겨받은 풀 이름으로 바인딩해야 한다(클러스터 출력과 연결해 순서를 걸기 위해)."
+  }
+}
