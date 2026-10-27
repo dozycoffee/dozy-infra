@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-- 저장소 뼈대, GCP 준비 절차(README), DNS 스택(`stacks/dns`)까지 있다(`infra-01`~`infra-05` 완료). `modules/network`(+`stacks/gcp`)까지 있고, 나머지 테라폼 모듈과 차트는 아직 없다. 지금 GCP에는 DNS 스택 자원만 있고 네트워크는 내려가 있다(올릴 때 `stacks/gcp`를 apply).
+- 저장소 뼈대, GCP 준비 절차(README), DNS 스택(`stacks/dns`)까지 있다(`infra-01`~`infra-05b` 완료). `modules/network`(+`stacks/gcp`)까지 있고, 나머지 테라폼 모듈과 차트는 아직 없다. 지금 GCP에는 DNS 스택 자원만 있고 네트워크는 내려가 있다(올릴 때 `stacks/gcp`를 apply).
 - GCP 프로젝트 `dozy-jinwoo`, 상태 버킷 `dozy-jinwoo-tfstate`, `dozy.kr` DNS 존(`dozy-kr`)이 실제로 만들어져 있다. `dozy.kr`의 네임서버는 Cloud DNS(`ns-cloud-b1~b4`)다.
 - 인증서 `dozy-kr-wildcard`는 `ACTIVE`이고 `dozy.kr`, `*.dozy.kr` 모두 `AUTHORIZED`다.
 - 설계는 `docs/infra-repo-design.md`에 있고, 미결정·확인 필요 항목 19개가 남아 있다(특히 매니지드 Kafka 인증, 부하 테스트 토큰 방식, 토픽 값, ghcr 공개 여부).
@@ -64,9 +64,18 @@
 - `verify.sh`에 차트 테스트(ruby) 단계를 추가했다. PyYAML, `yq`, `kubeconform`, `helm unittest`가 없어 macOS 기본 ruby를 쓴다.
 - 아직 확인하지 못한 것(`infra-05c`): 실제 브로커 기동, 토픽 생성 Job 성공, 서비스 네임스페이스에서 접속, 네트워크 정책 차단, Autopilot에서 StatefulSet과 PVC 동작, Docker Hub 이미지 pull(NAT 필요), `apache/kafka` 이미지가 UID 1000과 `fsGroup` 설정에서 `/var/lib/kafka/data`에 쓸 수 있는지.
 
+### 2026-10-27 (infra-05b)
+
+- `charts/dozy-service` 추가: Deployment, Service, ServiceAccount, ConfigMap, ExternalSecret, NetworkPolicy(허용 대상이 없으면 전부 차단), 선택으로 HPA, PDB, Ingress. 비루트 UID 10001, 읽기 전용 루트 파일 시스템(+`/tmp`), seccomp, 권한 상승 금지, Actuator probe(startup/liveness/readiness), graceful 종료(grace 60초, preStop 5초). `env`/`config` 값은 `tpl`로 `.Values.db` 등을 참조한다.
+- 렌더링 단계에서 막는 것: `latest`·`main`·`master` 태그, 태그·프로필 없음, `local` 프로필(쉼표 목록 포함), `env`로 프로필 덮어쓰기, 선언하지 않은 비밀값 키 참조, 빈 `env`/`config` 값(generated 누락).
+- `releases/` 추가: `index.yaml`(auth wave 1, 나머지 wave 2), `common.yaml`, auth·inventory·wms·catalog values. 이미지가 모두 **비공개**(ghcr)여서 `imagePullSecrets: [ghcr-pull]`을 두었다(Secret은 `infra-06`). 이미지 이름은 `dozy-<서비스>-api`다. wms는 0.1.1이 토픽 생성 코드를 아직 갖고 있어 제거 이후 커밋(`sha-4769752`)으로 고정했다. auth는 임시로 `dev` 프로필.
+- `scripts/render-config.sh`(terraform output → `releases/generated/common.yaml`, `<서비스>.yaml`; DB 비밀번호는 쓰지 않는다)와 `scripts/deploy.sh`(index 순서, `--only`, `--dry-run`, `--generated`) 추가. 생성 폴더 `.gitignore` 경로를 `releases/generated/`로 고쳤다(예전 `k8s/overlays` 경로가 남아 있었다).
+- 테스트 76개(ruby): 차트 동작, `releases/` 렌더링(필수 환경변수, 고정 태그, 서비스 간 URL·포트, 서명 키 파일 이름과 kid 일치, terraform `services` 선언과의 일치, 평문 비밀값 금지), `deploy.sh`, 가짜 terraform을 쓴 `render-config.sh`. 변조 12종 모두 검출. `verify.sh`가 `releases/`를 가짜 generated 값(`charts/dozy-service/tests/fixtures/generated`)으로 `deploy.sh --dry-run` 렌더링한다.
+- 아직 확인하지 못한 것: catalog 환경변수 이름(저장소를 로컬에 두지 않아 설계 문서 5.1절 목록을 따랐다), 실제 클러스터에서의 기동, ESO의 `external-secrets.io/v1` 지원, 읽기 전용 루트 파일 시스템에서 각 서비스가 쓰는 경로(`/tmp` 외), 서비스의 actuator probe 경로(auth, catalog), Cloud SQL 접속, `dev` 프로필 auth의 `/dev/**` 노출 범위.
+
 ## 다음 세션에서 할 일
 
 1. 설계 문서의 결정 필요 항목을 차차 정한다(`docs/infra-repo-design.md` 10절). 먼저 Auth 프로필, 부하 테스트 토큰, 토픽 값.
 2. `terraform` 설치(README 0단계). 이후 `.tf` 파일을 추가하면 `scripts/verify.sh`가 terraform을 요구한다.
-3. `infra-05b`(공통 Helm 차트). 코드와 로컬 검증(`helm lint/template`, ruby 렌더링 테스트)으로 시작한다.
-4. `infra-05c`: Kafka를 클러스터에 올려 검증한다(파티션 값은 정해졌다).
+3. `infra-05c`: Kafka를 클러스터에 올려 검증한다(파티션 값은 정해졌다).
+4. `infra-06`(auth 배포) 전에 정할 것: ESO 설치와 `apiVersion`, ghcr pull secret 만드는 방법(10절 #10), auth `signing-keys` PEM 생성·등록, owner 이메일(`DOZY_OWNER_EMAIL`).

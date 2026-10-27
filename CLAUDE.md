@@ -28,9 +28,9 @@ scripts/             verify.sh, up.sh, down.sh, deploy.sh, render-config.sh
 ## 규칙
 
 - **공개 저장소다.** 비밀값, `*.tfvars`, 상태 파일, `generated/`는 절대 커밋하지 않는다. 비밀값은 Secret Manager에 두고 매니페스트에는 참조만 둔다.
-- 서비스 코드는 이 저장소에 두지 않는다. 이미지는 `ghcr.io/dozycoffee/<서비스>:<X.Y.Z>`를 참조만 하고, `latest`는 쓰지 않는다.
+- 서비스 코드는 이 저장소에 두지 않는다. 이미지는 `ghcr.io/dozycoffee/<이미지 이름>:<X.Y.Z>`(이름은 저장소 이름, 예: `dozy-auth-api`)를 참조만 하고, `latest`는 쓰지 않는다.
 - 팀원마다 자기 GCP 프로젝트를 쓴다. 사람마다 달라지는 값은 `terraform.tfvars`(커밋 안 함)로만 주입하고 코드에 박지 않는다. `terraform.tfvars.example`은 항상 최신으로 유지한다.
-- Kafka는 `kafka_mode = self | managed` 변수로 전환한다. 서비스 values에 Kafka 주소나 보안 설정을 직접 박지 않고 `releases/generated/values.yaml`(terraform output 기반)로만 준다.
+- Kafka는 `kafka_mode = self | managed` 변수로 전환한다. 서비스 values에 Kafka 주소나 보안 설정을 직접 박지 않고 `releases/generated/`(terraform output 기반, `render-config.sh`가 만든다)로만 준다.
 - Kafka 토픽은 `topics/topics.yaml`에 선언하고 서비스는 만들지 않는다. 브로커 자동 생성은 끈다. 값은 서비스의 이벤트 계약 문서를 기준으로 하고, 문서에 없는 값은 지어내지 않는다.
 - 새 서비스는 `services` 맵, `releases/<서비스>.yaml`, `releases/index.yaml`(, `topics.yaml`) 추가로 끝나야 한다. 서비스 때문에 공통 차트나 모듈을 고쳐야 하면 설계를 먼저 의심한다.
 - 클라우드에서는 `local` 프로필을 쓰지 않는다. 릴리스 전 서비스는 `sha-` 태그로 고정하고 `latest`, `main` 태그는 쓰지 않는다.

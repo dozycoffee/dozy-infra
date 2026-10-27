@@ -72,7 +72,7 @@ dozy-infra/
    └─ kafka-compare.md        Kafka 비교 실험 기록 양식
 ```
 
-- 서비스 코드는 이 저장소에 두지 않는다. 이미지는 `ghcr.io/dozycoffee/<서비스>:<태그>`를 참조만 한다.
+- 서비스 코드는 이 저장소에 두지 않는다. 이미지는 `ghcr.io/dozycoffee/<이미지 이름>:<태그>`를 참조만 한다. 이미지 이름은 저장소 이름과 같다(`dozy-auth-api`, `dozy-inventory-api`, `dozy-wms-api`, `dozy-catalog-api`). 패키지가 모두 **비공개**라서 클러스터는 pull secret(`ghcr-pull`)이 필요하다.
 - `terraform.tfvars`, `generated/`, 상태 파일, 비밀값은 `.gitignore`에 넣는다. 이 저장소는 공개이므로 특히 주의한다.
 - Kafka 브로커(`kafka-self`)도 Helm 차트로 두어 배포 도구를 하나로 통일한다. 외부 차트(관측 스택 등)는 `third-party/`의 values로 설치한다.
 
@@ -85,14 +85,16 @@ dozy-infra/
 | Deployment | 이미지(저장소, 태그), replicas, 리소스, 포트, 환경변수 |
 | Service | 업무 포트 |
 | ConfigMap | 일반 설정 (주소, CORS origin 등) |
-| ExternalSecret | 참조할 Secret Manager 항목 이름 목록 |
+| ExternalSecret | 참조할 Secret Manager 항목 이름 목록. 환경변수(`secretEnv`)나 파일(`secretVolumes`)로 붙인다 |
 | probe | 경로와 포트 (기본값은 Spring Actuator) |
 | ServiceAccount | Workload Identity 사용 여부 |
 | HPA, PDB | 켜기 여부와 상한 |
 | NetworkPolicy | 허용할 상대 (DB, Kafka, 다른 서비스) |
 | Ingress 규칙 | 외부에 노출할 경로. 기본은 노출하지 않음 |
 
-공통 규칙(비루트 실행 UID 10001, JVM 힙 비율, graceful 종료, `/actuator/*` 비노출)은 차트의 기본값으로 둔다. 서비스가 다르게 해야 할 때만 values로 덮어쓴다.
+공통 규칙(비루트 실행 UID 10001, 읽기 전용 루트 파일 시스템과 `/tmp` 쓰기, JVM 힙 비율, graceful 종료(grace 60초, preStop 5초), `/actuator/*` 비노출)은 차트의 기본값으로 둔다. 서비스가 다르게 해야 할 때만 values로 덮어쓴다.
+
+차트가 렌더링 단계에서 막는 것: `image.tag`가 없거나 `latest`·`main`·`master`, `profile`이 없거나 `local` 포함(쉼표 목록 포함), `env`로 `SPRING_PROFILES_ACTIVE`를 덮어쓰기, `secretEnv`·`secretVolumes`가 `externalSecret.items`에 없는 키를 가리킴, `env`·`config` 값이 빈 문자열. NetworkPolicy는 허용 대상이 없으면 모든 수신을 막는다(`ingress: []`). 차트 테스트와 `releases/` 렌더링 검사는 `charts/dozy-service/tests/render_test.rb`다.
 
 ## 4. 팀원별 배포 방식
 
@@ -117,7 +119,7 @@ dozy-infra/
 
 ### 4.3 테라폼 → Helm 값 전달
 
-Cloud SQL의 프라이빗 IP, 매니지드 Kafka 주소 같은 값은 테라폼이 만든 뒤에야 안다. `render-config.sh`가 `terraform output`을 읽어 `releases/generated/values.yaml`을 만들고, `deploy.sh`가 이 파일을 `-f`로 마지막에 겹쳐 준다(우선순위: `common.yaml` < `<서비스>.yaml` < `generated/values.yaml`). 생성 파일은 커밋하지 않는다.
+Cloud SQL의 프라이빗 IP, 매니지드 Kafka 주소 같은 값은 테라폼이 만든 뒤에야 안다. `render-config.sh`가 `terraform output`을 읽어 `releases/generated/common.yaml`(도메인, Kafka 주소, auth 주소, 비밀값 접두사)과 `releases/generated/<서비스>.yaml`(서비스별 DB 접속 정보, 비밀번호 제외)을 만들고, `deploy.sh`가 `-f`로 마지막에 겹쳐 준다(우선순위: `common.yaml` < `<서비스>.yaml` < `generated/common.yaml` < `generated/<서비스>.yaml`). 생성 파일은 커밋하지 않는다. 서비스 values의 `env`는 `"{{ .Values.db.host }}"` 같은 템플릿으로 이 값을 참조하고, 값이 비면 차트가 렌더링을 실패시킨다(빈 값으로 기동하지 않게). 도메인은 `DOZY_DOMAIN` 또는 `stacks/dns/terraform.tfvars`에서, auth의 owner 이메일(개인 정보)은 `DOZY_OWNER_EMAIL`에서 읽는다.
 
 ### 4.4 도메인과 DNS
 
@@ -192,9 +194,9 @@ services = {
 
 | 서비스 | 저장소 | 포트 | 프로필 | 이미지 태그 | 비고 |
 |---|---|---|---|---|---|
-| auth | PostgreSQL | 8080 | `prod` 또는 `dev` (8절) | `sha-`/`X.Y.Z` | replicas 1 고정, 서명 키 볼륨 |
-| inventory | MySQL | 8082 | `prod` | `X.Y.Z` (0.1.1) | 다중 인스턴스 안전 |
-| wms | MySQL | 8080 | (구분 없음) | `X.Y.Z` (0.1.1) | 프로브용 actuator 상태 확인 필요 |
+| auth | PostgreSQL | 8080 | `dev`(임시, 10절 #6) | `0.1.0` | replicas 1 고정, 서명 키 볼륨. 이미지 `dozy-auth-api` |
+| inventory | MySQL | 8082 | `prod` | `0.1.1` | 다중 인스턴스 안전 |
+| wms | MySQL | 8080 | `prod`(동작 차이 없음, local만 아니면 됨) | `sha-4769752` | 0.1.1은 토픽 생성 코드가 남아 있어(ADR-0026 이전) 제거 이후 커밋을 쓴다. 프로브용 actuator 상태 확인 필요 |
 | catalog | PostgreSQL | 8080 | `prod` | **`sha-` 고정** (릴리스 전) | Kafka 발행, Store 호출(`STORE_BASE_URL`), `/actuator/prometheus`가 업무 포트에서 열림 |
 | store | PostgreSQL | 8080 | `prod` | 이미지 없음 | **자리만.** Dockerfile과 이미지 워크플로가 생긴 뒤 추가 |
 
@@ -211,7 +213,7 @@ catalog 관련 주의:
 ```
 1. terraform init -backend-config=...  →  terraform apply
 2. gcloud container clusters get-credentials ...
-3. render-config.sh                    (terraform output → releases/generated/values.yaml)
+3. render-config.sh                    (terraform output → releases/generated/*.yaml)
 4. 비밀값 확인                          (Secret Manager에 필요한 항목이 있는지 검사만 한다)
 5. 외부 차트 설치                       (ESO, 관측 스택)
 6. kafka-self 설치                     (kafka_mode=self일 때. 브로커 → 토픽 생성 Job)
@@ -361,7 +363,7 @@ topics:
 | 메모리 | 힙 1GB, 컨테이너 limit 2GB에서 시작 (부하 테스트로 조정) |
 | 디스크 | PVC는 기본 StorageClass. 크기는 보존 기간과 함께 정한다 |
 
-- 서비스 쪽은 `KAFKA_BOOTSTRAP_SERVERS`를 위 주소로 준다. 이 값은 `releases/generated/values.yaml`이 정한다.
+- 서비스 쪽은 `KAFKA_BOOTSTRAP_SERVERS`를 위 주소로 준다. 이 값은 `releases/generated/common.yaml`이 정한다.
 - inventory, wms, catalog는 **같은 브로커**를 쓴다. 로컬 compose처럼 각자 브로커를 띄우지 않는다.
 
 ### 9.2 2단계: 매니지드 (`kafka_mode=managed`)
@@ -385,18 +387,18 @@ topics:
 | 3 | 토픽 값 | `dozy.catalog.product` 등의 파티션 수, 보존 기간. 각 서비스 이벤트 계약 확인 후 확정. 서비스 저장소 문서에는 파티션·보존 수치가 없었다(2026-10-27 확인). **임시 결정(2026-10-27): 키 순서가 필요한 토픽 3, DLT 1로 `topics/topics.yaml`에 반영했다. 부하 테스트 뒤 조정한다.** 보존 기간은 미정 |
 | 4 | wms 토픽 생성 코드 제거 | **완료**(wms ADR-0026, dozy-wms-api PR #156, 2026-10-16 머지). inventory에는 지울 코드가 없다(7.4절). 이제 `dozy.wms.warehouse-access`는 인프라가 만들어야 한다(`topics.yaml`) |
 | 5 | 매니지드 토픽 리소스 | GCP provider가 매니지드 Kafka 토픽 리소스를 지원하는지 |
-| 6 | Auth 프로필 | Auth를 `prod`로 올릴지, SMTP 제공자 확정 전까지 `dev`로 둘지 |
+| 6 | Auth 프로필 | **임시 결정(2026-10-27): `dev`로 배포한다**(메일을 로그로 출력). `prod`는 `AUTH_MAIL_SENDER=console`을 거부해 실제 SMTP가 필요하다. `dev`는 개발용 토큰 API(`/dev/**`)를 여는데, Ingress로 열지 않고 NetworkPolicy로 클러스터 안에서만 접근하게 둔다. SMTP 제공자를 정하면 `prod`로 바꾼다 |
 | 7 | 부하 테스트 토큰 | Auth의 system client 토큰 발급 방식 확인. (b) 가능 여부, 안 되면 (a) |
 | 8 | 부하 도구 파라미터화 | 서비스 저장소의 k6 스크립트가 대상 주소와 토큰을 외부에서 받는지 |
 | 9 | Auth 클라이언트 부트스트랩 | catalog: audience `catalog`, 역할 `catalog:admin`, `catalog:store_agent`, system client `svc-catalog`(Store 쪽 `store:catalog_agent` 역할). 수동 절차를 README에 둘지 시드로 할지 |
-| 10 | ghcr 패키지 공개 여부 | 클러스터가 인증 없이 pull할 수 있는지. private이면 `imagePullSecrets` 필요 |
+| 10 | ghcr 패키지 공개 여부 | **확인(2026-10-27): 네 패키지 모두 비공개다.** 클러스터가 pull하려면 `imagePullSecrets`(`ghcr-pull`)가 필요하다. 차트는 이름만 받고 Secret은 만들지 않는다. 읽기 전용 토큰(`read:packages`)을 Secret Manager에서 ESO로 가져와 `kubernetes.io/dockerconfigjson` Secret을 만드는 절차는 `infra-06`에서 정한다. 패키지를 공개로 바꾸면 이 항목이 사라진다 |
 | 11 | catalog 릴리스 | v0.2.0 릴리스 전까지 `sha-` 고정. 릴리스 후 `X.Y.Z`로 전환 |
 | 12 | store 이미지 | store 저장소에 Dockerfile과 이미지 푸시 워크플로가 없다. 추가된 뒤에 배포 |
 | 13 | catalog 관리 포트 | `/actuator/prometheus`가 업무 포트에서 토큰 없이 열려 있다. 상위 문서의 "관리 포트 분리 표준"(미결정 #4)과 어긋나므로 Ingress에서 `/actuator/*`를 막고, 장기적으로 포트를 분리할지 |
 | 14 | Autopilot에서 StatefulSet과 PVC | 디스크 성능과 리소스 요청 제약. 올려 보고 확인 |
 | 15 | JWKS 조회 경로 | 상위 문서 미결정 #5와 같다. `AUTH_ISSUER_BASE_URI`를 어떤 주소로 줄지 결정이 선행된다 |
-| 16 | 비밀값 주입 방식 | External Secrets Operator와 CSI 드라이버 중 선택 (상위 문서 7절) |
-| 17 | 공통 차트 범위 | auth는 서명 키 볼륨과 replicas 1 고정이 있어 공통 차트로 충분한지, 예외가 되는지 |
+| 16 | 비밀값 주입 방식 | **ESO(External Secrets Operator)로 정했다**(차트가 `ExternalSecret`을 만든다). 아직 ESO를 설치하지 않았다. 차트의 `apiVersion`은 `external-secrets.io/v1`로 두었는데 설치할 ESO 버전이 이 버전을 서빙하는지 확인하지 않았다(`infra-06`에서 설치 때 확인, 다르면 `externalSecret.apiVersion`으로 바꾼다). 비밀값을 사람이 넣어야 한다: auth의 `signing-keys`(PKCS#8 RSA PEM)와 catalog의 `auth-client-secret`. 값이 없으면 ESO 동기화가 실패해 파드가 시작하지 않는다 |
+| 17 | 공통 차트 범위 | **공통 차트로 충분하다**(2026-10-27). auth의 서명 키는 `secretVolumes`, replicas 1은 values로 표현된다. 서명 키 파일 이름이 `AUTH_SIGNING_ACTIVE_KID`와 같아야 하며, 테스트가 이를 확인한다(`signingKid` 값 하나로 둘 다 만든다). 실제 기동은 `infra-06`에서 확인한다 |
 | 18 | 도메인 네임서버 이전 | **완료**(2026-10-20). 서브도메인 위임 대신 `dozy.kr` 전체를 Cloud DNS로 이전했다. 존을 다시 만들면 네임서버 세트가 바뀔 수 있다(4.4절) |
 | 19 | TLS 인증서 연동 확인 | **구글 관리형(Certificate Manager, DNS 인증, 와일드카드)으로 결정, 인증서 `ACTIVE` 확인(2026-10-20).** 남은 확인: Autopilot 외부 Ingress에서 certificate map 사용 가능 여부(안 되면 Gateway API), Certificate Manager 비용 |
 | 20 | inventory 이벤트 문서의 압축 요구 | 결정: 인프라가 `compact`로 선언(7.5절). inventory `docs/events.md`에 이 요구를 적을지(서비스 저장소 문서 작업) |

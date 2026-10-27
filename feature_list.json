@@ -83,8 +83,8 @@
   {
     "id": "infra-05b",
     "name": "공통 Helm 차트와 releases 구조",
-    "description": "charts/dozy-service(Deployment, Service, ConfigMap, ExternalSecret, probe, HPA, PDB, NetworkPolicy, Ingress), releases/(index, common, 서비스별 values), deploy.sh, render-config.sh. 클라우드에서 local 프로필을 막는 검사 포함",
-    "status": "pending",
+    "description": "charts/dozy-service(Deployment, Service, ConfigMap, ExternalSecret, probe, HPA, PDB, NetworkPolicy, Ingress), releases/(index, common, 서비스별 values), deploy.sh, render-config.sh. local 프로필·floating 태그·빈 generated 값을 렌더링 단계에서 막는다. ruby 테스트 76개, 변조 12종 검출. 클러스터 검증은 infra-06",
+    "status": "completed",
     "dependencies": [
       "infra-04",
       "infra-04b"
