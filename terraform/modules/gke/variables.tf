@@ -69,8 +69,9 @@ variable "master_authorized_cidrs" {
 }
 
 variable "node_service_account_email" {
-  description = "노드가 쓸 서비스 계정 이메일. 기본 Compute 서비스 계정을 쓰지 않는다."
+  description = "노드가 쓸 서비스 계정 이메일. 평소에는 전용 서비스 계정을 넣는다. null이면 지정하지 않아 기본 Compute 서비스 계정(편집자 권한)이 쓰이므로 진단할 때만 쓴다."
   type        = string
+  default     = null
 }
 
 variable "release_channel" {

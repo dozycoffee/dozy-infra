@@ -38,10 +38,14 @@ resource "google_container_cluster" "this" {
     channel = var.release_channel
   }
 
-  cluster_autoscaling {
-    auto_provisioning_defaults {
-      service_account = var.node_service_account_email
-      oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+  dynamic "cluster_autoscaling" {
+    for_each = var.node_service_account_email == null ? [] : [var.node_service_account_email]
+
+    content {
+      auto_provisioning_defaults {
+        service_account = cluster_autoscaling.value
+        oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+      }
     }
   }
 }

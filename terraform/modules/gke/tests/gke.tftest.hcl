@@ -171,3 +171,21 @@ run "invalid_release_channel_is_rejected" {
 
   expect_failures = [var.release_channel]
 }
+
+run "node_service_account_is_not_set_when_null" {
+  command = apply
+
+  variables {
+    node_service_account_email = null
+  }
+
+  assert {
+    condition     = try(google_container_cluster.this.cluster_autoscaling[0].auto_provisioning_defaults[0].service_account, null) == null
+    error_message = "null이면 노드 서비스 계정을 지정하지 않아야 한다(기본 Compute 서비스 계정, 진단용)."
+  }
+
+  assert {
+    condition     = google_container_cluster.this.enable_autopilot == true && google_container_cluster.this.private_cluster_config[0].enable_private_nodes == true
+    error_message = "서비스 계정을 지정하지 않아도 Autopilot과 프라이빗 노드는 유지되어야 한다."
+  }
+}

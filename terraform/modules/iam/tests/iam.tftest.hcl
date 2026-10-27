@@ -23,8 +23,8 @@ run "node_service_account_has_only_logging_and_monitoring_roles" {
   }
 
   assert {
-    condition     = toset([for m in google_project_iam_member.nodes : m.role]) == toset(["roles/logging.logWriter", "roles/monitoring.metricWriter", "roles/monitoring.viewer", "roles/stackdriver.resourceMetadata.writer", "roles/autoscaling.metricsWriter"])
-    error_message = "노드에는 로그와 지표를 쓰는 최소 역할만 줘야 한다."
+    condition     = toset([for m in google_project_iam_member.nodes : m.role]) == toset(["roles/container.defaultNodeServiceAccount", "roles/logging.logWriter", "roles/monitoring.metricWriter", "roles/monitoring.viewer", "roles/stackdriver.resourceMetadata.writer", "roles/autoscaling.metricsWriter"])
+    error_message = "노드에는 기본 노드 역할과 로그·지표를 쓰는 최소 역할만 줘야 한다."
   }
 
   assert {

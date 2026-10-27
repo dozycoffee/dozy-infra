@@ -15,9 +15,10 @@ variable "name" {
 }
 
 variable "node_roles" {
-  description = "GKE 노드 서비스 계정에 줄 역할. 로그와 지표를 쓰는 최소 권한이다."
+  description = "GKE 노드 서비스 계정에 줄 역할. 로그와 지표를 쓰는 최소 권한이다. roles/container.defaultNodeServiceAccount는 GKE 문서가 사용자 지정 노드 서비스 계정에 요구하는 역할이다."
   type        = list(string)
   default = [
+    "roles/container.defaultNodeServiceAccount",
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
     "roles/monitoring.viewer",
