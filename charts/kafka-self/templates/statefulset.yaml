@@ -90,6 +90,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/kafka/data
+              # 디스크 루트의 lost+found를 Kafka가 토픽 디렉터리로 읽고 기동에 실패하므로 하위 경로만 마운트한다
+              subPath: kafka
   volumeClaimTemplates:
     - metadata:
         name: data

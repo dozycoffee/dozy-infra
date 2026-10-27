@@ -117,6 +117,15 @@ class KafkaSelfRenderTest < Minitest::Test
     end
   end
 
+  def test_data_dir_is_a_subpath_so_lost_and_found_is_not_in_the_log_dir
+    # ext4 디스크 루트에는 lost+found가 있고, Kafka는 로그 디렉터리의 그 폴더를 토픽으로 읽다가 기동에 실패한다(2026-10-27 GKE에서 확인)
+    sts = find(render, "StatefulSet")
+    c = sts["spec"]["template"]["spec"]["containers"][0]
+    mount = c["volumeMounts"].find { |m| m["name"] == "data" }
+    assert_equal "kafka", mount["subPath"]
+    assert_equal mount["mountPath"], env_of(sts)["KAFKA_LOG_DIRS"]
+  end
+
   def test_persistent_volume_claim_defaults
     pvc = find(render, "StatefulSet")["spec"]["volumeClaimTemplates"][0]
     assert_equal "data", pvc["metadata"]["name"]
