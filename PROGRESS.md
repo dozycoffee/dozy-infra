@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-- 저장소 뼈대, GCP 준비 절차(README), DNS 스택(`stacks/dns`)까지 있다(`infra-01`~`infra-04b` 완료). `modules/network`(+`stacks/gcp`)까지 있고, 나머지 테라폼 모듈과 차트는 아직 없다. 지금 GCP에는 DNS 스택 자원만 있고 네트워크는 내려가 있다(올릴 때 `stacks/gcp`를 apply).
+- 저장소 뼈대, GCP 준비 절차(README), DNS 스택(`stacks/dns`)까지 있다(`infra-01`~`infra-05` 완료). `modules/network`(+`stacks/gcp`)까지 있고, 나머지 테라폼 모듈과 차트는 아직 없다. 지금 GCP에는 DNS 스택 자원만 있고 네트워크는 내려가 있다(올릴 때 `stacks/gcp`를 apply).
 - GCP 프로젝트 `dozy-jinwoo`, 상태 버킷 `dozy-jinwoo-tfstate`, `dozy.kr` DNS 존(`dozy-kr`)이 실제로 만들어져 있다. `dozy.kr`의 네임서버는 Cloud DNS(`ns-cloud-b1~b4`)다.
 - 인증서 `dozy-kr-wildcard`는 `ACTIVE`이고 `dozy.kr`, `*.dozy.kr` 모두 `AUTHORIZED`다.
 - 설계는 `docs/infra-repo-design.md`에 있고, 미결정·확인 필요 항목 19개가 남아 있다(특히 매니지드 Kafka 인증, 부하 테스트 토큰 방식, 토픽 값, ghcr 공개 여부).
@@ -56,8 +56,17 @@
 - `gke` 모듈의 `node_service_account_email`을 선택 입력(null이면 미지정)으로 바꾸고 테스트를 추가했다. 진단용 스택 스위치는 제거했다. `iam`의 기본 역할에 `roles/container.defaultNodeServiceAccount`가 포함되어 있다(문서가 사용자 지정 노드 서비스 계정에 요구하는 역할이며 해가 없다. 이 역할이 없어도 되는지는 확인하지 않았다).
 - `.gitignore`의 `secrets/` 규칙이 `modules/secrets`를 가려서 첫 커밋에서 빠졌다가 `f8c64ec`로 고쳤다(`/secrets/`로 한정). 푸시 전에 새로 클론해서 검증한다.
 
+### 2026-10-27 (infra-05)
+
+- `charts/kafka-self` 추가: KRaft 단일 브로커 StatefulSet(`apache/kafka:3.9.1`, 힙 1GB, 메모리 2Gi, PVC 10Gi), 헤드리스 Service(`publishNotReadyAddresses`), NetworkPolicy(`app` 네임스페이스와 토픽 생성 Job만 9092 접속), 토픽 ConfigMap과 생성 Job(post-install/post-upgrade 훅, `--if-not-exists`). 광고 주소는 `kafka-0.kafka-headless.<네임스페이스>.svc.cluster.local:9092`, 브로커 토픽 자동 생성은 끈다. 비root(UID 1000) 실행, 권한 상승 금지.
+- `topics/topics.yaml` 작성(단일 원본): 확인된 값만 적고 모르는 파티션은 처음 `TBD`로 두었다가 사용자 결정으로 키 순서 토픽 3, DLT 1로 채웠다(부하 테스트 뒤 조정). 차트는 파티션이 숫자가 아니면 렌더링에 실패한다(의도). wms의 `dozy.wms.warehouse-access`(3, 복제 1, 압축)와 inventory 상품 토픽 압축은 반영했다.
+- 렌더링 테스트 33개(ruby minitest): 브로커 설정, 광고 주소, 네임스페이스 추종, 자동 생성 끔, 보안 설정, PVC, 네트워크 정책, 토픽 줄 생성, 훅, 잘못된 입력 거부, `topics.yaml` 형식. 변조 8종(자동 생성 켬, 광고 주소 localhost, 복제본 3개, Ready 전 DNS 해제, 훅 시점 변경, 네임스페이스 고정, 압축 설정 오타, `--if-not-exists` 제거)을 모두 검출했다. `LANG` 미설정 환경에서 한글 비교가 깨져 UTF-8을 명시했다.
+- `verify.sh`에 차트 테스트(ruby) 단계를 추가했다. PyYAML, `yq`, `kubeconform`, `helm unittest`가 없어 macOS 기본 ruby를 쓴다.
+- 아직 확인하지 못한 것(`infra-05c`): 실제 브로커 기동, 토픽 생성 Job 성공, 서비스 네임스페이스에서 접속, 네트워크 정책 차단, Autopilot에서 StatefulSet과 PVC 동작, Docker Hub 이미지 pull(NAT 필요), `apache/kafka` 이미지가 UID 1000과 `fsGroup` 설정에서 `/var/lib/kafka/data`에 쓸 수 있는지.
+
 ## 다음 세션에서 할 일
 
 1. 설계 문서의 결정 필요 항목을 차차 정한다(`docs/infra-repo-design.md` 10절). 먼저 Auth 프로필, 부하 테스트 토큰, 토픽 값.
 2. `terraform` 설치(README 0단계). 이후 `.tf` 파일을 추가하면 `scripts/verify.sh`가 terraform을 요구한다.
-3. `infra-05`(Kafka)와 `infra-05b`(공통 Helm 차트). 둘 다 코드와 로컬 검증(`helm lint/template`)부터 시작할 수 있고, 클러스터가 필요한 확인은 마지막에 한 번에 한다.
+3. `infra-05b`(공통 Helm 차트). 코드와 로컬 검증(`helm lint/template`, ruby 렌더링 테스트)으로 시작한다.
+4. `infra-05c`: Kafka를 클러스터에 올려 검증한다(파티션 값은 정해졌다).

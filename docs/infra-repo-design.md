@@ -351,11 +351,12 @@ topics:
 |---|---|
 | 네임스페이스 | `kafka` |
 | 리소스 | StatefulSet 1개, 헤드리스 Service 1개, PVC 1개, 토픽 생성 Job |
-| 이미지 | `apache/kafka`. 버전은 compose와 같은 3.8~3.9 계열 |
+| 이미지 | `apache/kafka:3.9.1`(Docker Hub). 로컬 compose는 catalog가 3.9.1, inventory·wms가 3.8.0이다. Docker Hub에서 받으므로 Cloud NAT가 필요하다 |
 | 내부 주소 | `kafka-0.kafka-headless.kafka.svc.cluster.local:9092` |
 | `advertised.listeners` | 위 내부 주소와 **반드시 같게** (`localhost`면 연결 후 통신이 실패한다) |
 | 복제 계수 | 오프셋, 트랜잭션 로그 모두 1 |
 | 토픽 자동 생성 | 끔 ([7절](#7-kafka-토픽-관리)) |
+| 토픽 생성 | `topics/topics.yaml`을 `-f`로 넘기면 Helm 훅 Job(post-install, post-upgrade)이 브로커가 뜬 뒤 `--if-not-exists`로 만든다. **이미 있는 토픽의 설정은 바꾸지 않는다.** `partitions`가 숫자가 아니면(TBD) 렌더링이 실패한다 |
 | 보안 | PLAINTEXT. 클러스터 안에서만 접근하고 NetworkPolicy로 `app` 네임스페이스에서만 허용 |
 | 메모리 | 힙 1GB, 컨테이너 limit 2GB에서 시작 (부하 테스트로 조정) |
 | 디스크 | PVC는 기본 StorageClass. 크기는 보존 기간과 함께 정한다 |
@@ -381,7 +382,7 @@ topics:
 |---|---|---|
 | 1 | 문서 수락 | 2절의 결정 사항 전체 |
 | 2 | 매니지드 Kafka 인증 | GCP 매니지드 Kafka가 요구하는 인증 방식(SASL 종류, TLS)과 서비스가 환경변수만으로 받을 수 있는지(`spring.kafka.properties.*` 바인딩). 안 되면 서비스 저장소 설정 수정 필요 |
-| 3 | 토픽 값 | `dozy.catalog.product` 등의 파티션 수, 보존 기간. 각 서비스 이벤트 계약 확인 후 확정 |
+| 3 | 토픽 값 | `dozy.catalog.product` 등의 파티션 수, 보존 기간. 각 서비스 이벤트 계약 확인 후 확정. 서비스 저장소 문서에는 파티션·보존 수치가 없었다(2026-10-27 확인). **임시 결정(2026-10-27): 키 순서가 필요한 토픽 3, DLT 1로 `topics/topics.yaml`에 반영했다. 부하 테스트 뒤 조정한다.** 보존 기간은 미정 |
 | 4 | wms 토픽 생성 코드 제거 | **완료**(wms ADR-0026, dozy-wms-api PR #156, 2026-10-16 머지). inventory에는 지울 코드가 없다(7.4절). 이제 `dozy.wms.warehouse-access`는 인프라가 만들어야 한다(`topics.yaml`) |
 | 5 | 매니지드 토픽 리소스 | GCP provider가 매니지드 Kafka 토픽 리소스를 지원하는지 |
 | 6 | Auth 프로필 | Auth를 `prod`로 올릴지, SMTP 제공자 확정 전까지 `dev`로 둘지 |

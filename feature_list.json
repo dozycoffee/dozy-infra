@@ -62,11 +62,21 @@
   },
   {
     "id": "infra-05",
-    "name": "Kafka 직접 구성과 토픽 선언(kafka_mode=self)",
-    "description": "charts/kafka-self(StatefulSet, 헤드리스 Service, PVC, 토픽 생성 Job)와 topics/topics.yaml. 브로커 토픽 자동 생성은 끈다. advertised.listeners는 내부 DNS와 일치시킨다",
-    "status": "pending",
+    "name": "Kafka 직접 구성과 토픽 선언 코드(kafka_mode=self)",
+    "description": "charts/kafka-self(KRaft 단일 브로커 StatefulSet, 헤드리스 Service, PVC, NetworkPolicy, 토픽 생성 Job 훅)와 topics/topics.yaml. 브로커 토픽 자동 생성은 끈다. 광고 주소는 파드 DNS. ruby(minitest) 렌더링 테스트 33개, 변조 8종 검출 확인. 클러스터에 올린 검증은 infra-05c",
+    "status": "completed",
     "dependencies": [
       "infra-04",
+      "infra-04b"
+    ]
+  },
+  {
+    "id": "infra-05c",
+    "name": "kafka-self를 클러스터에 올려 검증",
+    "description": "스택을 올린 뒤 helm upgrade --install kafka charts/kafka-self -n kafka --create-namespace -f topics/topics.yaml. 브로커 기동, 토픽 생성 Job 성공, app 네임스페이스에서 접속, NetworkPolicy 차단 확인. 파티션은 키 순서 토픽 3, DLT 1로 정했다(2026-10-27). Docker Hub 이미지라 Cloud NAT가 필요하다",
+    "status": "pending",
+    "dependencies": [
+      "infra-05",
       "infra-04b"
     ]
   },
@@ -87,7 +97,8 @@
     "status": "pending",
     "dependencies": [
       "infra-05",
-      "infra-05b"
+      "infra-05b",
+      "infra-05c"
     ]
   },
   {
