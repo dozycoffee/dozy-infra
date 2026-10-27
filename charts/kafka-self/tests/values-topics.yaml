@@ -1,0 +1,14 @@
+# 테스트용 토픽 선언(실제 값이 아니다). 렌더링 동작만 확인한다.
+topics:
+  - name: test.plain
+    owner: svc-a
+    partitions: 3
+  - name: test.compact
+    owner: svc-b
+    partitions: 1
+    cleanupPolicy: compact
+  - name: test.retained
+    owner: svc-c
+    partitions: 2
+    cleanupPolicy: delete
+    retentionMs: 604800000

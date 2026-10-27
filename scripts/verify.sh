@@ -59,6 +59,16 @@ if find charts -name Chart.yaml -type f 2>/dev/null | grep -q .; then
       d="$(dirname "$c")"
       helm lint "$d" || ng "helm lint: $d"
     done < <(find charts -name Chart.yaml -type f)
+    # 차트 테스트: helm template을 렌더링해서 검증한다(ruby 필요, 클러스터는 필요 없다)
+    if find charts -path '*/tests/*_test.rb' -type f | grep -q .; then
+      if command -v ruby >/dev/null; then
+        while IFS= read -r t; do
+          ruby "$t" || ng "차트 테스트: $t"
+        done < <(find charts -path '*/tests/*_test.rb' -type f)
+      else
+        ng "차트 테스트가 있는데 ruby가 설치되어 있지 않다"
+      fi
+    fi
     # 서비스별 values로 공통 차트를 렌더링하고, 클라우드에서 쓰면 안 되는 local 프로필을 막는다
     if [ -d charts/dozy-service ] && ls releases/*.yaml >/dev/null 2>&1; then
       for v in releases/*.yaml; do

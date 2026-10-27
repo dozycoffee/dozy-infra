@@ -1,0 +1,80 @@
+{{- if .Values.topics }}
+# 브로커가 뜬 뒤 선언한 토픽을 만든다. 이미 있는 토픽은 건너뛴다(설정은 바꾸지 않는다).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.name }}-topics-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafka-self.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        {{- include "kafka-self.labels" . | nindent 8 }}
+        app.kubernetes.io/component: topic-init
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: topics-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: BOOTSTRAP
+              value: {{ include "kafka-self.bootstrap" . | quote }}
+            - name: WAIT_ATTEMPTS
+              value: {{ .Values.topicsJob.waitAttempts | quote }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              KAFKA_BIN=/opt/kafka/bin
+              echo "브로커를 기다린다: ${BOOTSTRAP}"
+              for _ in $(seq 1 "${WAIT_ATTEMPTS}"); do
+                if "${KAFKA_BIN}/kafka-broker-api-versions.sh" --bootstrap-server "${BOOTSTRAP}" >/dev/null 2>&1; then
+                  break
+                fi
+                sleep 5
+              done
+              "${KAFKA_BIN}/kafka-broker-api-versions.sh" --bootstrap-server "${BOOTSTRAP}" >/dev/null
+
+              while IFS=$'\t' read -r name partitions rf configs; do
+                [ -z "${name}" ] && continue
+                args=(--bootstrap-server "${BOOTSTRAP}" --create --if-not-exists --topic "${name}" --partitions "${partitions}" --replication-factor "${rf}")
+                IFS=',' read -ra cfgs <<< "${configs}"
+                for c in "${cfgs[@]:-}"; do
+                  [ -n "${c}" ] && args+=(--config "${c}")
+                done
+                echo "토픽 생성: ${name} (partitions=${partitions}, rf=${rf}, configs=${configs})"
+                "${KAFKA_BIN}/kafka-topics.sh" "${args[@]}"
+              done < /config/topics.tsv
+
+              echo "현재 토픽:"
+              "${KAFKA_BIN}/kafka-topics.sh" --bootstrap-server "${BOOTSTRAP}" --list
+          resources:
+            {{- toYaml .Values.topicsJob.resources | nindent 12 }}
+          volumeMounts:
+            - name: topics
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: topics
+          configMap:
+            name: {{ .Values.name }}-topics
+{{- end }}

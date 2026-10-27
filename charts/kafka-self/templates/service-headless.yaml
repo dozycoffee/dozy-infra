@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.headlessServiceName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafka-self.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  # 브로커가 Ready가 되기 전에도 DNS가 풀려야 광고 주소로 자기 자신에게 접속할 수 있다
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "kafka-self.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: client
+      port: {{ .Values.port }}
+      targetPort: client

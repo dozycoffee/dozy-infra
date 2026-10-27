@@ -1,0 +1,38 @@
+{{- if .Values.topics }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.name }}-topics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafka-self.labels" . | nindent 4 }}
+data:
+  # 한 줄에 토픽 하나: 이름 <TAB> 파티션 <TAB> 복제 계수 <TAB> 설정(쉼표로 구분)
+  topics.tsv: |
+    {{- range $t := .Values.topics }}
+    {{- if not $t.name }}
+    {{- fail "토픽에 name이 없다" }}
+    {{- end }}
+    {{- if not (or (kindIs "float64" $t.partitions) (kindIs "int64" $t.partitions) (kindIs "int" $t.partitions)) }}
+    {{- fail (printf "토픽 %s: partitions는 숫자여야 한다(현재 %v). topics/topics.yaml의 TBD는 서비스의 이벤트 계약을 보고 정해야 한다" $t.name $t.partitions) }}
+    {{- end }}
+    {{- if lt (int $t.partitions) 1 }}
+    {{- fail (printf "토픽 %s: partitions는 1 이상이어야 한다" $t.name) }}
+    {{- end }}
+    {{- $rf := int (default 1 $t.replicationFactor) }}
+    {{- $cfg := list }}
+    {{- if $t.cleanupPolicy }}
+    {{- if not (has $t.cleanupPolicy (list "delete" "compact")) }}
+    {{- fail (printf "토픽 %s: cleanupPolicy는 delete 또는 compact여야 한다(현재 %v)" $t.name $t.cleanupPolicy) }}
+    {{- end }}
+    {{- $cfg = append $cfg (printf "cleanup.policy=%s" $t.cleanupPolicy) }}
+    {{- end }}
+    {{- if hasKey $t "retentionMs" }}
+    {{- if not (or (kindIs "float64" $t.retentionMs) (kindIs "int64" $t.retentionMs) (kindIs "int" $t.retentionMs)) }}
+    {{- fail (printf "토픽 %s: retentionMs는 숫자(밀리초)여야 한다(현재 %v)" $t.name $t.retentionMs) }}
+    {{- end }}
+    {{- $cfg = append $cfg (printf "retention.ms=%d" (int64 $t.retentionMs)) }}
+    {{- end }}
+    {{ printf "%s\t%d\t%d\t%s" $t.name (int $t.partitions) $rf (join "," $cfg) }}
+    {{- end }}
+{{- end }}

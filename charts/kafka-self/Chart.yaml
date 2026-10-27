@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kafka-self
+description: 클러스터 안에 직접 띄우는 Kafka 단일 브로커(KRaft)와 토픽 생성 Job. kafka_mode=self일 때 쓴다.
+type: application
+version: 0.1.0
+appVersion: "3.9.1"
