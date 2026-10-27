@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-- 저장소 뼈대, GCP 준비 절차(README), DNS 스택(`stacks/dns`)까지 있다(`infra-01`~`infra-05b` 완료). `modules/network`(+`stacks/gcp`)까지 있고, 나머지 테라폼 모듈과 차트는 아직 없다. 지금 GCP에는 DNS 스택 자원만 있고 네트워크는 내려가 있다(올릴 때 `stacks/gcp`를 apply).
+- 저장소 뼈대, GCP 준비 절차(README), DNS 스택(`stacks/dns`)까지 있다(`infra-01`~`infra-05c` 완료). `modules/network`(+`stacks/gcp`)까지 있고, 나머지 테라폼 모듈과 차트는 아직 없다. 지금 GCP에는 DNS 스택 자원만 있고 네트워크는 내려가 있다(올릴 때 `stacks/gcp`를 apply).
 - GCP 프로젝트 `dozy-jinwoo`, 상태 버킷 `dozy-jinwoo-tfstate`, `dozy.kr` DNS 존(`dozy-kr`)이 실제로 만들어져 있다. `dozy.kr`의 네임서버는 Cloud DNS(`ns-cloud-b1~b4`)다.
 - 인증서 `dozy-kr-wildcard`는 `ACTIVE`이고 `dozy.kr`, `*.dozy.kr` 모두 `AUTHORIZED`다.
 - 설계는 `docs/infra-repo-design.md`에 있고, 미결정·확인 필요 항목 19개가 남아 있다(특히 매니지드 Kafka 인증, 부하 테스트 토큰 방식, 토픽 값, ghcr 공개 여부).
@@ -73,9 +73,16 @@
 - 테스트 76개(ruby): 차트 동작, `releases/` 렌더링(필수 환경변수, 고정 태그, 서비스 간 URL·포트, 서명 키 파일 이름과 kid 일치, terraform `services` 선언과의 일치, 평문 비밀값 금지), `deploy.sh`, 가짜 terraform을 쓴 `render-config.sh`. 변조 12종 모두 검출. `verify.sh`가 `releases/`를 가짜 generated 값(`charts/dozy-service/tests/fixtures/generated`)으로 `deploy.sh --dry-run` 렌더링한다.
 - 아직 확인하지 못한 것: catalog 환경변수 이름(저장소를 로컬에 두지 않아 설계 문서 5.1절 목록을 따랐다), 실제 클러스터에서의 기동, ESO의 `external-secrets.io/v1` 지원, 읽기 전용 루트 파일 시스템에서 각 서비스가 쓰는 경로(`/tmp` 외), 서비스의 actuator probe 경로(auth, catalog), Cloud SQL 접속, `dev` 프로필 auth의 `/dev/**` 노출 범위.
 
+### 2026-10-27 (infra-05c)
+
+- 네트워크, IAM, GKE만 `-target`으로 올렸다(21개, Cloud SQL·비밀값 제외). 노드는 Kafka 파드가 생긴 뒤 약 1분 만에 만들어졌다.
+- **결함 발견:** 브로커가 `Found directory /var/lib/kafka/data/lost+found`로 기동에 실패해 재시작을 반복했다. GCE 영구 디스크(ext4) 루트의 `lost+found`를 Kafka가 토픽 디렉터리로 읽기 때문이다. 데이터 볼륨을 `subPath: kafka`로 마운트하도록 고치고 테스트(34개)를 추가했다. 로컬 렌더링 테스트로는 잡을 수 없던 문제다.
+- 재설치 후: 브로커 `Running`(재시작 0, 메모리 약 500Mi), PVC `standard-rwo` 10Gi 바인딩, 토픽 생성 Job 성공(브로커가 뜰 때까지 기다리느라 약 6분), 토픽 11개의 파티션과 `cleanup.policy=compact`(`warehouse-access`, `inventory.product`)가 `topics.yaml`과 일치했다.
+- 접속: `app` 네임스페이스 파드에서 `kafka-0.kafka-headless.kafka.svc.cluster.local:9092` 접속 성공. 다른 네임스페이스는 실패했고, NetworkPolicy를 지운 뒤에는 성공해서 정책이 차단 원인임을 확인했다(정책은 복구했다). Docker Hub 이미지는 Cloud NAT를 통해 받았다(약 45초).
+- 확인하지 못한 것: 디스크 성능, 파드 재시작 후 데이터 유지(PVC 재사용), 클러스터 밖(운영 VM)에서의 접속.
+
 ## 다음 세션에서 할 일
 
 1. 설계 문서의 결정 필요 항목을 차차 정한다(`docs/infra-repo-design.md` 10절). 먼저 Auth 프로필, 부하 테스트 토큰, 토픽 값.
 2. `terraform` 설치(README 0단계). 이후 `.tf` 파일을 추가하면 `scripts/verify.sh`가 terraform을 요구한다.
-3. `infra-05c`: Kafka를 클러스터에 올려 검증한다(파티션 값은 정해졌다).
-4. `infra-06`(auth 배포) 전에 정할 것: ESO 설치와 `apiVersion`, ghcr pull secret 만드는 방법(10절 #10), auth `signing-keys` PEM 생성·등록, owner 이메일(`DOZY_OWNER_EMAIL`).
+3. `infra-06`(auth 배포) 전에 정할 것: ESO 설치와 `apiVersion`, ghcr pull secret 만드는 방법(10절 #10), auth `signing-keys` PEM 생성·등록, owner 이메일(`DOZY_OWNER_EMAIL`).

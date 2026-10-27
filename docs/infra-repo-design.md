@@ -395,7 +395,7 @@ topics:
 | 11 | catalog 릴리스 | v0.2.0 릴리스 전까지 `sha-` 고정. 릴리스 후 `X.Y.Z`로 전환 |
 | 12 | store 이미지 | store 저장소에 Dockerfile과 이미지 푸시 워크플로가 없다. 추가된 뒤에 배포 |
 | 13 | catalog 관리 포트 | `/actuator/prometheus`가 업무 포트에서 토큰 없이 열려 있다. 상위 문서의 "관리 포트 분리 표준"(미결정 #4)과 어긋나므로 Ingress에서 `/actuator/*`를 막고, 장기적으로 포트를 분리할지 |
-| 14 | Autopilot에서 StatefulSet과 PVC | 디스크 성능과 리소스 요청 제약. 올려 보고 확인 |
+| 14 | Autopilot에서 StatefulSet과 PVC | **확인(2026-10-27).** PVC는 `standard-rwo`(10Gi)로 바로 바인딩되고 StatefulSet이 정상 동작한다. 첫 파드는 노드 생성(약 1분)과 이미지 pull(Docker Hub `apache/kafka`, 약 45초, Cloud NAT 경유)을 기다린다. UID 1000으로 데이터 디렉터리에 쓸 수 있다(`fsGroup`). **ext4 디스크 루트의 `lost+found`를 Kafka가 토픽으로 읽고 기동에 실패해 `subPath: kafka`로 마운트하도록 고쳤다.** 디스크 성능은 측정하지 않았다 |
 | 15 | JWKS 조회 경로 | 상위 문서 미결정 #5와 같다. `AUTH_ISSUER_BASE_URI`를 어떤 주소로 줄지 결정이 선행된다 |
 | 16 | 비밀값 주입 방식 | **ESO(External Secrets Operator)로 정했다**(차트가 `ExternalSecret`을 만든다). 아직 ESO를 설치하지 않았다. 차트의 `apiVersion`은 `external-secrets.io/v1`로 두었는데 설치할 ESO 버전이 이 버전을 서빙하는지 확인하지 않았다(`infra-06`에서 설치 때 확인, 다르면 `externalSecret.apiVersion`으로 바꾼다). 비밀값을 사람이 넣어야 한다: auth의 `signing-keys`(PKCS#8 RSA PEM)와 catalog의 `auth-client-secret`. 값이 없으면 ESO 동기화가 실패해 파드가 시작하지 않는다 |
 | 17 | 공통 차트 범위 | **공통 차트로 충분하다**(2026-10-27). auth의 서명 키는 `secretVolumes`, replicas 1은 values로 표현된다. 서명 키 파일 이름이 `AUTH_SIGNING_ACTIVE_KID`와 같아야 하며, 테스트가 이를 확인한다(`signingKid` 값 하나로 둘 다 만든다). 실제 기동은 `infra-06`에서 확인한다 |

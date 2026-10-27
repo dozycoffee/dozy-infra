@@ -73,8 +73,8 @@
   {
     "id": "infra-05c",
     "name": "kafka-self를 클러스터에 올려 검증",
-    "description": "스택을 올린 뒤 helm upgrade --install kafka charts/kafka-self -n kafka --create-namespace -f topics/topics.yaml. 브로커 기동, 토픽 생성 Job 성공, app 네임스페이스에서 접속, NetworkPolicy 차단 확인. 파티션은 키 순서 토픽 3, DLT 1로 정했다(2026-10-27). Docker Hub 이미지라 Cloud NAT가 필요하다",
-    "status": "pending",
+    "description": "GKE(스택 일부: network, iam, gke)에 kafka-self를 올려 검증했다(2026-10-27). 브로커 기동, 토픽 11개 생성(파티션·compact 설정 일치), app 네임스페이스 접속 성공, 다른 네임스페이스 접속 차단(정책을 지우면 접속되는 대조 실험으로 NetworkPolicy가 원인임을 확인). 발견한 결함: ext4 lost+found로 기동 실패 → subPath 마운트로 수정",
+    "status": "completed",
     "dependencies": [
       "infra-05",
       "infra-04b"
