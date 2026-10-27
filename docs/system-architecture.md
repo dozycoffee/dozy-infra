@@ -199,6 +199,8 @@ flowchart TB
 | 배포 정의 | 공통 Helm 차트 `dozy-service` + 서비스별 values | 서비스 추가가 values 파일 추가로 끝난다. 자세한 구조는 [infra-repo-design.md](infra-repo-design.md) |
 | 배포 | 이미지 태그 변경 → `helm upgrade` (이후 GitOps 검토) | |
 
+**Autopilot의 노드 생성 방식(2026-10-27 확인):** 사용자 워크로드가 없으면 노드가 0개이고, `kube-system` 등의 시스템 파드는 `Pending`으로 대기한다. 리소스 요청이 있는 워크로드를 올리면 오토스케일러가 약 1분 안에 노드를 만든다(존마다 1개씩 3개가 만들어졌다). 그래서 "클러스터를 올린 직후 노드가 없다"는 오류가 아니다. 노드는 구글 소유 프로젝트에 있어 `gcloud compute instances list`에 보이지 않으므로 `kubectl get nodes`로 확인한다. 노드 이미지는 NAT 없이도 Private Google Access로 구글 레지스트리(`gcr.io`)에서 받을 수 있지만, ghcr.io 같은 외부 레지스트리는 Cloud NAT가 있어야 한다.
+
 ### 서비스별 레플리카 시작값
 
 | 서비스 | replicas | 배포 전략 | 비고 |

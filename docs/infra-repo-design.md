@@ -404,7 +404,7 @@ topics:
 | 23 | DB 비밀번호가 상태 파일에 남음 | 비밀번호를 `random_password`로 만들어 `google_sql_user`와 Secret Manager에 넣으므로 값이 테라폼 상태 파일에도 남는다. 상태 버킷은 비공개·버전 관리·공개 차단이지만 접근은 본인으로 제한되어야 한다. 더 안전한 방식은 쓰기 전용 속성(`password_wo`, `secret_data_wo`)과 ephemeral 리소스다 |
 | 24 | ESO의 Secret Manager 권한 범위 | `dozy-eso` 서비스 계정이 프로젝트 전체의 `secretmanager.secretAccessor`를 가진다. 이름 접두사(`dozy-`)로 제한하는 IAM 조건을 거는 것을 검토한다. 프로젝트의 기본 Compute 서비스 계정(편집자 권한)은 노드에 쓰지 않지만 그대로 남아 있다 |
 | 25 | PostgreSQL 사용자 권한 | 서비스별 DB 사용자가 Flyway 마이그레이션에 필요한 권한을 갖는지 확인하지 않았다. auth, catalog를 배포할 때(`infra-06`, `infra-07`) 확인한다 |
-| 26 | GKE 노드가 만들어지지 않음 | 2026-10-26 `apply`한 Autopilot 클러스터가 `RUNNING`인데 28분 동안 노드가 0개였고 시스템 파드가 `FailedScheduling`이었다. 노드 VM과 인스턴스 그룹이 없고, 클러스터 조건 오류도 없고, 컴퓨트 할당량과 GKE 서비스 에이전트 역할은 정상이었다. 노드 서비스 계정 권한은 기본 노드 역할의 권한 6개를 모두 포함한다. 원인은 모른다. `infra-04b`에서 가설을 하나씩 확인한다 |
+| 26 | GKE 노드가 만들어지지 않음 | **해결: 결함이 아니었다**(2026-10-27). Autopilot은 사용자 워크로드가 없으면 노드가 0개가 정상이고, 시스템 파드는 첫 워크로드로 노드가 만들어질 때까지 `Pending`이다. 리소스 요청이 있는 테스트 파드를 올리자 약 60초 만에 노드 3개(존마다 1개)가 생기고 파드 56개가 모두 `Running`이 되었다. 전용 서비스 계정으로 만든 새 노드도 18초 만에 `Ready`가 되었다. Autopilot 노드는 프로젝트의 `compute instances list`에 보이지 않고 `node-pools list`도 막혀 있어서, 앞선 "노드 VM 없음" 확인은 근거가 되지 않았다 |
 
 ## 11. 구축 순서
 
