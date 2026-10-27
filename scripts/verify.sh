@@ -69,15 +69,16 @@ if find charts -name Chart.yaml -type f 2>/dev/null | grep -q .; then
         ng "차트 테스트가 있는데 ruby가 설치되어 있지 않다"
       fi
     fi
-    # 서비스별 values로 공통 차트를 렌더링하고, 클라우드에서 쓰면 안 되는 local 프로필을 막는다
-    if [ -d charts/dozy-service ] && ls releases/*.yaml >/dev/null 2>&1; then
-      for v in releases/*.yaml; do
-        case "$(basename "$v")" in common.yaml|index.yaml) continue ;; esac
-        out="$(helm template "$(basename "$v" .yaml)" charts/dozy-service -f releases/common.yaml -f "$v")" || { ng "helm template: $v"; continue; }
+    # releases/ 전체를 가짜 generated 값으로 렌더링하고(deploy.sh --dry-run), 클라우드에서 쓰면 안 되는 local 프로필을 막는다
+    if [ -d charts/dozy-service ] && [ -f releases/index.yaml ]; then
+      if command -v ruby >/dev/null; then
+        out="$(scripts/deploy.sh --dry-run --generated charts/dozy-service/tests/fixtures/generated)" || ng "deploy.sh --dry-run"
         if grep -A1 'SPRING_PROFILES_ACTIVE' <<<"$out" | grep -Eq 'value: "?local"?'; then
-          ng "local 프로필 사용 금지: $v"
+          ng "local 프로필 사용 금지(releases/)"
         fi
-      done
+      else
+        ng "releases가 있는데 ruby가 설치되어 있지 않다"
+      fi
     fi
   else
     ng "차트가 있는데 helm이 설치되어 있지 않다"

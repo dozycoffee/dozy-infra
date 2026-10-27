@@ -1,0 +1,25 @@
+# catalog: 릴리스 전이라 sha- 태그로 고정(설계 문서 10절 #11). Store로 분리 작업 중이라 릴리스 노트를 보며 맞춘다.
+# 저장소를 로컬에 두지 않아 환경변수 이름은 설계 문서 5.1절의 목록을 따랐다. 아직 기동으로 확인하지 않았다(infra-07)
+image:
+  repository: ghcr.io/dozycoffee/dozy-catalog-api
+  tag: sha-4422791
+
+profile: prod
+port: 8080
+
+env:
+  DB_HOST: "{{ .Values.db.host }}"
+  DB_PORT: "{{ .Values.db.port }}"
+  DB_NAME: "{{ .Values.db.name }}"
+  DB_USERNAME: "{{ .Values.db.user }}"
+  KAFKA_BOOTSTRAP_SERVERS: "{{ .Values.kafka.bootstrapServers }}"
+  DOZY_AUTH_ISSUER_BASE_URI: "{{ .Values.auth.issuerBaseUri }}"
+  # Store가 아직 없다. 없으면 판매 범위 변경만 503으로 거부되고 기동에는 영향이 없다
+  STORE_BASE_URL: http://store:8080
+  CATALOG_CORS_ALLOWED_ORIGINS: "https://admin.{{ .Values.domain }}"
+
+externalSecret:
+  items: [db-password, auth-client-secret]
+secretEnv:
+  - { name: DB_PASSWORD, key: db-password }
+  - { name: DOZY_AUTH_CLIENT_SECRET, key: auth-client-secret }

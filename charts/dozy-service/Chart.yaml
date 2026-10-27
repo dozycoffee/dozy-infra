@@ -1,0 +1,5 @@
+apiVersion: v2
+name: dozy-service
+description: Dozy Spring Boot 서비스용 공통 차트. 서비스는 values로 값만 준다.
+type: application
+version: 0.1.0

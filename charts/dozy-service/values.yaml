@@ -1,0 +1,104 @@
+# 공통 차트 기본값. 서비스별 값은 releases/<서비스>.yaml, 모든 서비스 공통 값은 releases/common.yaml,
+# terraform output에서 나오는 값은 releases/generated/*.yaml로 덮어쓴다.
+# 서비스 이름은 릴리스 이름(helm upgrade --install <이름>)이다.
+
+image:
+  repository: "" # 필수. 예: ghcr.io/dozycoffee/dozy-auth-api
+  tag: ""        # 필수. X.Y.Z 또는 sha-<7자리>. latest, main은 거부한다
+  pullPolicy: IfNotPresent
+# 비공개 레지스트리(ghcr)용 pull secret 이름 목록. Secret은 이 차트가 만들지 않는다
+imagePullSecrets: []
+
+# 필수. 쉼표로 여러 개 줄 수 있다. local은 인증을 우회하므로 거부한다(설계 문서 8.1절)
+profile: ""
+
+replicas: 1
+port: 8080
+
+# 평문 환경변수. 값에는 템플릿({{ .Values.db.host }} 등)을 쓸 수 있다
+env: {}
+# ConfigMap으로 만들어 envFrom으로 붙이는 일반 설정. env와 같이 템플릿을 쓸 수 있다
+config: {}
+
+# terraform output이 채우는 값(releases/generated). 서비스 values의 env에서 템플릿으로 참조한다
+db: {}
+kafka: {}
+auth: {}
+domain: ""
+
+# 비밀값. 값은 Secret Manager에만 있고 ExternalSecret이 같은 이름의 Kubernetes Secret으로 가져온다.
+# Secret Manager 항목 ID는 <secretPrefix>-<릴리스 이름>-<name> 이다(terraform/modules/secrets).
+externalSecret:
+  enabled: true
+  secretPrefix: dozy
+  storeName: gcp-secret-manager
+  storeKind: ClusterSecretStore
+  apiVersion: external-secrets.io/v1
+  refreshInterval: 1h
+  # 가져올 항목 이름 목록. Kubernetes Secret의 키도 같은 이름이다
+  items: []
+# 환경변수로 쓸 비밀값: [{ name: DB_PASSWORD, key: db-password }]
+secretEnv: []
+# 파일로 마운트할 비밀값: [{ name: signing-keys, mountPath: /secrets/signing-keys, items: [{ key: signing-keys, path: dozy-2026-09.pem }] }]
+secretVolumes: []
+
+serviceAccount:
+  create: true
+  # Workload Identity로 쓸 구글 서비스 계정 이메일. 비우면 연결하지 않는다
+  gcpServiceAccount: ""
+
+resources:
+  requests: { cpu: 500m, memory: 1Gi }
+  limits: { cpu: 500m, memory: 1Gi } # Autopilot은 요청과 한도를 같게 두는 것이 안전하다
+
+jvm:
+  # 이미지의 JAVA_TOOL_OPTIONS와 같은 값. 서비스가 다르게 할 때만 덮어쓴다
+  options: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+
+# Spring Actuator probe 기본값
+probes:
+  startup: { path: /actuator/health/liveness, failureThreshold: 36, periodSeconds: 5 }
+  liveness: { path: /actuator/health/liveness, periodSeconds: 10, failureThreshold: 3 }
+  readiness: { path: /actuator/health/readiness, periodSeconds: 5, failureThreshold: 3 }
+
+# Spring graceful shutdown(30s)보다 길게 둔다. preStop sleep은 엔드포인트 제거가 퍼질 시간이다
+terminationGracePeriodSeconds: 60
+preStopSleepSeconds: 5
+
+# 비루트(UID 10001)로 실행한다. 루트 파일 시스템은 읽기 전용이고 /tmp만 쓸 수 있다
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile: { type: RuntimeDefault }
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: false
+  minAvailable: 1
+
+# 들어오는 트래픽만 제한한다. 비활성이면 정책을 만들지 않는다.
+networkPolicy:
+  enabled: true
+  # 허용할 네임스페이스 이름 목록과 같은 네임스페이스의 파드 라벨 목록
+  allowedNamespaces: []
+  allowedPods: [] # 예: [{ app.kubernetes.io/name: inventory }]
+
+# 외부 노출. 기본은 노출하지 않는다. 경로를 명시한 것만 열리므로 /actuator/*는 열리지 않는다
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  annotations: {}
+  paths: [] # 예: [/api]
+  pathType: Prefix

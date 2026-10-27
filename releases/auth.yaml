@@ -1,0 +1,36 @@
+# auth: PostgreSQL, 서명 키 파일, 상태가 있어 replicas 1 고정(설계 문서 5.1절)
+image:
+  repository: ghcr.io/dozycoffee/dozy-auth-api
+  tag: 0.1.0
+
+# 임시: SMTP 제공자가 정해지기 전까지 dev(메일을 로그로 출력). prod는 AUTH_MAIL_SENDER=console을 거부한다(설계 문서 10절 #6)
+# dev는 개발용 토큰 API(/dev/**)를 연다. Ingress에서 열지 않고 NetworkPolicy로 클러스터 안에서만 접근하게 둔다
+profile: dev
+
+replicas: 1
+port: 8080
+
+signingKid: dozy-2026-10 # 서명 키 파일 이름(<kid>.pem)과 활성 키가 같아야 한다
+
+env:
+  AUTH_DB_URL: "jdbc:postgresql://{{ .Values.db.host }}:{{ .Values.db.port }}/{{ .Values.db.name }}"
+  AUTH_DB_USERNAME: "{{ .Values.db.user }}"
+  AUTH_ISSUER_BASE_URL: "{{ .Values.auth.issuerBaseUri }}"
+  AUTH_CORS_ALLOWED_ORIGINS: "https://admin.{{ .Values.domain }},https://partner.{{ .Values.domain }}"
+  AUTH_APP_URL_INTERNAL: "https://admin.{{ .Values.domain }}"
+  AUTH_APP_URL_PARTNER: "https://partner.{{ .Values.domain }}"
+  AUTH_MAIL_SENDER: console
+  AUTH_MAIL_FROM: "no-reply@{{ .Values.domain }}"
+  AUTH_SIGNING_KEYS_DIR: /secrets/signing-keys
+  AUTH_SIGNING_ACTIVE_KID: "{{ .Values.signingKid }}"
+  BOOTSTRAP_OWNER_EMAIL: "{{ .Values.auth.bootstrapOwnerEmail }}"
+
+externalSecret:
+  items: [db-password, signing-keys]
+secretEnv:
+  - { name: AUTH_DB_PASSWORD, key: db-password }
+secretVolumes:
+  - name: signing-keys
+    mountPath: /secrets/signing-keys
+    items:
+      - { key: signing-keys, path: dozy-2026-10.pem }

@@ -1,0 +1,23 @@
+image:
+  repository: ghcr.io/dozycoffee/dozy-wms-api
+  # 0.1.1은 토픽 생성 코드가 남아 있어(ADR-0026 이전) 제거 이후 커밋을 쓴다. 다음 릴리스가 나오면 X.Y.Z로 바꾼다
+  tag: sha-4769752
+
+profile: prod # wms는 프로필로 동작이 갈리지 않는다. local만 아니면 된다
+port: 8080
+
+env:
+  DB_HOST: "{{ .Values.db.host }}"
+  DB_PORT: "{{ .Values.db.port }}"
+  DB_NAME: "{{ .Values.db.name }}"
+  DB_USERNAME: "{{ .Values.db.user }}"
+  KAFKA_BOOTSTRAP_SERVERS: "{{ .Values.kafka.bootstrapServers }}"
+  AUTH_ISSUER_BASE_URI: "{{ .Values.auth.issuerBaseUri }}"
+  CORS_ALLOWED_ORIGINS: "https://admin.{{ .Values.domain }}"
+  INVENTORY_BASE_URL: http://inventory:8082
+  AUTH_CLIENT_ENABLED: "false"
+
+externalSecret:
+  items: [db-password]
+secretEnv:
+  - { name: DB_PASSWORD, key: db-password }

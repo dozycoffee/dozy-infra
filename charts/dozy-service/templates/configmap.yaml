@@ -1,0 +1,12 @@
+{{- if .Values.config }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dozy-service.name" . }}
+  labels:
+    {{- include "dozy-service.labels" . | nindent 4 }}
+data:
+  {{- range $k, $v := .Values.config }}
+  {{ $k }}: {{ include "dozy-service.render" (dict "value" $v "root" $ "key" $k) | quote }}
+  {{- end }}
+{{- end }}

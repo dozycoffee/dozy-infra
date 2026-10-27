@@ -1,0 +1,8 @@
+# 모든 서비스 공통 값. 서비스 값(<서비스>.yaml)과 generated/ 값이 이 위에 덮어쓴다.
+
+# ghcr 이미지가 비공개라서 pull secret이 필요하다. Secret은 infra-06에서 만든다(설계 문서 10절 #10)
+imagePullSecrets: [ghcr-pull]
+
+# 서비스끼리, 그리고 같은 네임스페이스 안에서만 접근한다. 외부 노출은 Ingress를 켠 서비스만(infra-13)
+networkPolicy:
+  allowedNamespaces: [app]

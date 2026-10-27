@@ -10,7 +10,7 @@ crash.log
 terraform/modules/**/.terraform.lock.hcl
 
 # render-config.sh가 만드는 값 파일 (terraform output 기반)
-k8s/overlays/*/generated/
+releases/generated/
 
 # 비밀값
 *.pem

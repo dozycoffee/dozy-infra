@@ -1,0 +1,1 @@
+db: { engine: mysql, host: 10.0.0.5, port: 3306, name: dozy_wms, user: wms }
